@@ -1,0 +1,16 @@
+# Yocto build output
+build/
+
+# Shared caches (large, machine-specific)
+downloads/
+sstate-cache/
+
+# External layers managed by kas
+poky/
+meta-openembedded/
+meta-qt6/
+meta-raspberrypi/
+
+# Editor/IDE
+*.swp
+.vscode/
