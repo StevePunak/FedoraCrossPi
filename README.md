@@ -98,6 +98,72 @@ scripts/
   build-sdk.sh
 ```
 
+## Qt Creator Kit Setup
+
+After installing the SDK, configure Qt Creator to cross-compile for the Pi.
+
+### 1. Source the SDK environment
+
+Qt Creator needs to inherit the SDK environment. Launch it from a terminal with the environment sourced:
+
+```bash
+source /opt/poky/<version>/environment-setup-cortexa72-poky-linux   # Pi 4
+# or
+source /opt/poky/<version>/environment-setup-cortexa76-poky-linux   # Pi 5
+
+qtcreator &
+```
+
+### 2. Add compilers — Tools → Preferences → Kits → Compilers
+
+Add two **GCC** compilers:
+
+| Slot | Binary |
+|------|--------|
+| C    | `$OECORE_NATIVE_SYSROOT/usr/bin/aarch64-poky-linux/aarch64-poky-linux-gcc` |
+| C++  | `$OECORE_NATIVE_SYSROOT/usr/bin/aarch64-poky-linux/aarch64-poky-linux-g++` |
+
+> **Important:** The C slot must use `gcc`, not `g++`. Using `g++` for C causes a CMake error:
+> `#error "The CMAKE_C_COMPILER is set to a C++ compiler"`
+
+### 3. Add Qt version — Tools → Preferences → Kits → Qt Versions
+
+Point to the cross-compiled `qmake`:
+```
+$OECORE_TARGET_SYSROOT/usr/bin/qmake
+```
+
+### 4. Create the kit — Tools → Preferences → Kits → Kits → Add
+
+| Field | Value |
+|-------|-------|
+| Name | `Poky RPi4 Qt6` (or `RPi5`) |
+| Device type | Generic Linux Device |
+| Sysroot | `$OECORE_TARGET_SYSROOT` |
+| C compiler | aarch64-poky-linux-gcc (added above) |
+| C++ compiler | aarch64-poky-linux-g++ (added above) |
+| Qt version | cross qmake (added above) |
+| CMake generator | Unix Makefiles or Ninja |
+
+### 5. Set CMake toolchain file
+
+In the kit's **CMake Configuration**, add:
+```
+-DCMAKE_TOOLCHAIN_FILE:FILEPATH=%{Sysroot}/../usr/share/cmake/OEToolchainConfig.cmake
+```
+
+Or when configuring a project manually:
+```bash
+cmake -DCMAKE_TOOLCHAIN_FILE=$OECORE_NATIVE_SYSROOT/usr/share/cmake/OEToolchainConfig.cmake ..
+```
+
+### 6. Deploy before run (optional)
+
+To have Qt Creator automatically deploy to the Pi before each run:
+**Projects → (your kit) → Run → Add Deploy Step → Deploy files via rsync**
+
+Set the device under **Devices** (Tools → Preferences → Devices → Add → Generic Linux Device), then Qt Creator will rsync the binary over SSH before launching.
+
 ## Layers
 
 | Layer | Branch | Purpose |
