@@ -1,0 +1,72 @@
+header:
+  version: 14
+
+machine: raspberrypi4-64
+distro: poky
+target: rpi4-qt6-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: walnascar
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded
+    branch: walnascar
+    layers:
+      meta-oe:
+      meta-multimedia:
+      meta-networking:
+      meta-python:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi
+    branch: walnascar
+    layers:
+      .:
+
+  meta-qt6:
+    url: https://code.qt.io/yocto/meta-qt6.git
+    branch: "6.10"
+    layers:
+      .:
+
+  meta-rpi4-custom:
+    path: meta-rpi4-custom
+    layers:
+      .:
+
+local_conf_header:
+  meta-rpi4-custom: |
+    # Init system
+    INIT_MANAGER = "systemd"
+
+    # Display: EGLFS with KMS/DRM (no compositor)
+    DISTRO_FEATURES:remove = "x11 directfb vulkan wayland"
+    DISTRO_FEATURES:append = " opengl eglfs alsa gles2 pam"
+
+    # Qt 6.10.x
+    PREFERRED_VERSION_qtbase = "6.10.%"
+    PREFERRED_VERSION_qtbase-native = "6.10.%"
+
+    # RPi 4 GPU
+    GPU_MEM = "128"
+    ENABLE_UART = "1"
+
+    # Accept restricted licenses required for RPi WiFi/BT firmware
+    LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
+
+    # Speed up builds with shared caches (adjust paths as needed)
+    DL_DIR ?= "${TOPDIR}/../downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+
+    # Auto-clean work directories after each package builds (saves ~100s of GB)
+    INHERIT += "rm_work"
+
+    # Parallelism — 48 cores
+    BB_NUMBER_THREADS = "48"
+    PARALLEL_MAKE = "-j 48"
