@@ -8,6 +8,7 @@ IMAGE_INSTALL:append = " \
     qtsvg \
     qtmqtt \
     qtserialbus \
+    qtgraphs \
     qtbase-plugins \
     liberation-fonts \
     fbset \
