@@ -2,6 +2,8 @@
 
 Yocto Walnascar (5.2) image and Qt 6.10 cross-compile SDK for Raspberry Pi 4/5, built from a Fedora 42 host.
 
+**[Download latest release](https://github.com/StevePunak/FedoraCrossPi/releases/latest)**
+
 ## What this produces
 
 - A bootable Linux image for Raspberry Pi 4B or Pi 5 with Qt 6.10, EGLFS/KMS display, SSH access
