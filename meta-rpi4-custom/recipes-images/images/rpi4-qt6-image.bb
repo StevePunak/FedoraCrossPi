@@ -31,6 +31,7 @@ IMAGE_INSTALL:append = " \
     shadow \
     rsync \
     dnf \
+    dhcpcd \
 "
 
 # Include SSH and allow passwordless root login (development image)
