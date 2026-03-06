@@ -34,7 +34,6 @@ IMAGE_INSTALL:append = " \
     dhcpcd \
     cifs-utils \
     avahi \
-    nss-mdns \
 "
 
 # Include SSH and allow passwordless root login (development image)
