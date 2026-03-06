@@ -16,10 +16,14 @@ IMAGE_INSTALL:append = " \
     iproute2 \
     coreutils \
     rsync \
+    dnf \
 "
 
 # Include SSH and allow passwordless root login (development image)
-IMAGE_FEATURES += "ssh-server-openssh allow-root-login empty-root-password"
+IMAGE_FEATURES += "ssh-server-openssh allow-root-login empty-root-password package-management"
+
+# Package manager
+PACKAGE_CLASSES = "package_rpm"
 
 # Install root SSH public key
 install_root_ssh_key() {
