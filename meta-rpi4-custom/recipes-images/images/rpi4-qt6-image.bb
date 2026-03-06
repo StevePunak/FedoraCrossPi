@@ -2,6 +2,11 @@ DESCRIPTION = "Qt 6.10 image for Raspberry Pi 4B with EGLFS display support"
 
 require recipes-core/images/core-image-base.bb
 
+# Replace busybox with full GNU utilities
+VIRTUAL-RUNTIME_base-utils = "util-linux-base"
+VIRTUAL-RUNTIME_login-manager = "shadow"
+IMAGE_INSTALL:remove = "busybox busybox-udhcpc busybox-udhcpd"
+
 IMAGE_INSTALL:append = " \
     packagegroup-qt6-essentials \
     qtmultimedia \
@@ -15,6 +20,15 @@ IMAGE_INSTALL:append = " \
     net-tools \
     iproute2 \
     coreutils \
+    util-linux \
+    procps \
+    findutils \
+    grep \
+    gawk \
+    sed \
+    tar \
+    bash \
+    shadow \
     rsync \
     dnf \
 "
