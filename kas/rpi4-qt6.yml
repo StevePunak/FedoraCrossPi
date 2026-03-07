@@ -71,7 +71,6 @@ local_conf_header:
     BB_NUMBER_THREADS = "48"
     PARALLEL_MAKE = "-j 48"
 
-    # Package feed — build machine serves RPMs for dnf on-device
-    # Run scripts/serve-packages.sh on the build host to activate
-    PACKAGE_FEED_URIS = "http://172.28.1.100:8080"
+    # Package feed — hosted on feyd, synced via scripts/sync-packages.sh
+    PACKAGE_FEED_URIS = "http://feyd:880"
     PACKAGE_FEED_BASE_PATHS = "rpm"
