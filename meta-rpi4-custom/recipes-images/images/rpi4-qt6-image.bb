@@ -32,6 +32,7 @@ IMAGE_INSTALL:append = " \
     rsync \
     dnf \
     dhcpcd \
+    taglib \
     cifs-utils \
     avahi-daemon \
     avahi-libnss-mdns \
