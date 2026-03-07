@@ -1,0 +1,12 @@
+[Unit]
+Description=Yocto RPM Package Feed Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/src/punak/rpi/build/tmp/deploy
+ExecStart=/usr/bin/python3 -m http.server 8080 --directory %h/src/punak/rpi/build/tmp/deploy
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
