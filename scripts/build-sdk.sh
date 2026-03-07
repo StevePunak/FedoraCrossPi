@@ -12,4 +12,4 @@ esac
 
 # Builds the Qt 6.10.x cross-compile SDK installer
 # Output: build/tmp/deploy/sdk/poky-glibc-x86_64-rpi4-qt6-image-cortexa7*-toolchain-*.sh
-exec kas shell "${KAS_FILE}" -- bitbake -c populate_sdk rpi4-qt6-image
+exec kas shell "${KAS_FILE}" -c "bitbake -c populate_sdk rpi4-qt6-image"
