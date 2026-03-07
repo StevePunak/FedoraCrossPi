@@ -32,6 +32,7 @@ IMAGE_INSTALL:append = " \
     rsync \
     dnf \
     systemd-networkd-config \
+    wpa-supplicant \
     taglib \
     taglib-dev \
     python3 \

@@ -1,0 +1,10 @@
+[Match]
+Type=wlan
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+[DHCP]
+UseDomains=yes
+RouteMetric=20
