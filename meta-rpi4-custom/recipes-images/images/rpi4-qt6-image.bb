@@ -33,6 +33,7 @@ IMAGE_INSTALL:append = " \
     dnf \
     dhcpcd \
     taglib \
+    taglib-dev \
     python3 \
     python3-venv \
     cifs-utils \
