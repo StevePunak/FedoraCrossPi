@@ -14,3 +14,4 @@ meta-raspberrypi/
 # Editor/IDE
 *.swp
 .vscode/
+kas/local.yml
