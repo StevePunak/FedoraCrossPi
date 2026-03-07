@@ -5,6 +5,7 @@ TARGET="${1:-rpi4}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
 PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-private/kas/private.yml"
+LOCAL_KAS="${REPO_ROOT}/kas/local.yml"
 
 case "${TARGET}" in
   rpi4) KAS_FILE="${REPO_ROOT}/kas/rpi4-qt6.yml" ;;
@@ -14,7 +15,8 @@ esac
 
 FULL_KAS="${KAS_FILE}"
 if [ -f "${PRIVATE_KAS}" ]; then
-    FULL_KAS="${KAS_FILE}:${PRIVATE_KAS}"
+    cp "${PRIVATE_KAS}" "${LOCAL_KAS}"
+    FULL_KAS="${KAS_FILE}:${LOCAL_KAS}"
 fi
 
 # Builds the Qt 6.10.x cross-compile SDK installer
