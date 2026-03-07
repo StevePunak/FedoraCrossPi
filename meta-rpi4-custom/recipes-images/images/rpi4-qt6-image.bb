@@ -33,6 +33,8 @@ IMAGE_INSTALL:append = " \
     dnf \
     dhcpcd \
     taglib \
+    python3 \
+    python3-venv \
     cifs-utils \
     avahi-daemon \
     avahi-libnss-mdns \
