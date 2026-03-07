@@ -70,3 +70,8 @@ local_conf_header:
     # Parallelism — 48 cores
     BB_NUMBER_THREADS = "48"
     PARALLEL_MAKE = "-j 48"
+
+    # Package feed — build machine serves RPMs for dnf on-device
+    # Run scripts/serve-packages.sh on the build host to activate
+    PACKAGE_FEED_URIS = "http://172.28.1.100:8080"
+    PACKAGE_FEED_BASE_PATHS = "rpm"
