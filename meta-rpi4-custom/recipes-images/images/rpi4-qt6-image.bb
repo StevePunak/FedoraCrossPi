@@ -31,7 +31,7 @@ IMAGE_INSTALL:append = " \
     shadow \
     rsync \
     dnf \
-    dhcpcd \
+    systemd-networkd-config \
     taglib \
     taglib-dev \
     python3 \

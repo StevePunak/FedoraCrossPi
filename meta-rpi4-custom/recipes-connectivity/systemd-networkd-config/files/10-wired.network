@@ -1,0 +1,10 @@
+[Match]
+Type=ether
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+[DHCP]
+UseDomains=yes
+RouteMetric=10
