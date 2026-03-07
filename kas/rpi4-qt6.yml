@@ -47,7 +47,7 @@ local_conf_header:
 
     # Display: EGLFS with KMS/DRM (no compositor)
     DISTRO_FEATURES:remove = "x11 directfb vulkan wayland"
-    DISTRO_FEATURES:append = " opengl eglfs alsa gles2 pam"
+    DISTRO_FEATURES:append = " opengl eglfs alsa gles2 pam bluetooth"
 
     # Qt 6.10.x
     PREFERRED_VERSION_qtbase = "6.10.%"

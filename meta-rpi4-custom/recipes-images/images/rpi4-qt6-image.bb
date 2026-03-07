@@ -40,6 +40,10 @@ IMAGE_INSTALL:append = " \
     cifs-utils \
     avahi-daemon \
     avahi-libnss-mdns \
+    bluez5 \
+    bluez5-obex \
+    rfkill \
+    qtconnectivity \
 "
 
 # Include SSH and allow passwordless root login (development image)
