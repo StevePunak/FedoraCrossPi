@@ -4,8 +4,10 @@ require recipes-core/images/core-image-base.bb
 
 # Replace busybox with full GNU utilities
 VIRTUAL-RUNTIME_base-utils = "util-linux-base"
+VIRTUAL-RUNTIME_base-utils-hwclock = "util-linux-hwclock"
+VIRTUAL-RUNTIME_base-utils-syslog = ""
 VIRTUAL-RUNTIME_login-manager = "shadow"
-IMAGE_INSTALL:remove = "busybox busybox-udhcpc busybox-udhcpd"
+IMAGE_INSTALL:remove = "busybox busybox-udhcpc busybox-udhcpd busybox-hwclock busybox-syslog"
 
 IMAGE_INSTALL:append = " \
     packagegroup-qt6-essentials \
