@@ -18,6 +18,20 @@ IMAGE_INSTALL:append = " \
     qtgraphs \
     qtbase-plugins \
     liberation-fonts \
+    ttf-dejavu-sans \
+    ttf-dejavu-sans-mono \
+    ttf-dejavu-serif \
+    ttf-roboto \
+    ttf-google-fira-sans \
+    ttf-google-fira-mono \
+    ttf-droid-sans \
+    ttf-droid-sans-mono \
+    ttf-inconsolata \
+    source-code-pro-fonts \
+    ttf-ubuntu-sans \
+    ttf-ubuntu-mono \
+    ttf-noto-emoji-color \
+    fontconfig \
     fbset \
     net-tools \
     iproute2 \
