@@ -61,6 +61,7 @@ IMAGE_INSTALL:append = " \
     bluez5-obex \
     rfkill \
     qtconnectivity \
+    expand-rootfs \
 "
 
 # Include SSH and allow passwordless root login (development image)
