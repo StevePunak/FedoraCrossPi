@@ -31,6 +31,7 @@ IMAGE_INSTALL:append = " \
     ttf-ubuntu-sans \
     ttf-ubuntu-mono \
     ttf-noto-emoji-color \
+    ttf-inter \
     fontconfig \
     fbset \
     net-tools \
