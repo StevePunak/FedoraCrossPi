@@ -61,6 +61,13 @@ IMAGE_INSTALL:append = " \
     bluez5-obex \
     rfkill \
     qtconnectivity \
+    pipewire \
+    pipewire-pulse \
+    pipewire-spa-plugins-meta \
+    pipewire-spa-plugins-bluez5 \
+    pipewire-modules-meta \
+    pipewire-alsa \
+    wireplumber \
     expand-rootfs \
 "
 
