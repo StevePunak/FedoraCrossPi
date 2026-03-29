@@ -68,6 +68,8 @@ IMAGE_INSTALL:append = " \
     pipewire-modules-meta \
     pipewire-alsa \
     wireplumber \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
     gdbserver \
     strace \
     ltrace \
