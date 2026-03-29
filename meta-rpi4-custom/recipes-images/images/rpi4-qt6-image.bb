@@ -68,6 +68,9 @@ IMAGE_INSTALL:append = " \
     pipewire-modules-meta \
     pipewire-alsa \
     wireplumber \
+    gdbserver \
+    strace \
+    ltrace \
     expand-rootfs \
 "
 
