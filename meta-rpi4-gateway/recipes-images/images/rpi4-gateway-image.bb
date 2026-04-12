@@ -40,7 +40,7 @@ IMAGE_INSTALL:append = " \
     avahi-libnss-mdns \
     wpa-supplicant \
     systemd-networkd-gateway-config \
-    expand-rootfs \
+    gateway-init \
 "
 
 # Include SSH and allow passwordless root login (development image)

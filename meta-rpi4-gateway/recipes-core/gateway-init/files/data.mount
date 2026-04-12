@@ -1,0 +1,13 @@
+[Unit]
+Description=Gateway config partition
+After=gateway-init.service
+Requires=gateway-init.service
+
+[Mount]
+What=LABEL=gateway-config
+Where=/data
+Type=ext4
+Options=defaults,noatime
+
+[Install]
+WantedBy=local-fs.target

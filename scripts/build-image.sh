@@ -19,10 +19,14 @@ case "${TARGET}" in
     KAS_FILE="${REPO_ROOT}/kas/rpi4-gateway.yml"
     PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-gateway-private/kas/private.yml"
     ;;
-  *) echo "Usage: $0 [rpi4|rpi5|gateway]" >&2; exit 1 ;;
+  qemu-gateway)
+    KAS_FILE="${REPO_ROOT}/kas/qemu-gateway.yml"
+    PRIVATE_KAS=""
+    ;;
+  *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway]" >&2; exit 1 ;;
 esac
 
-if [ -f "${PRIVATE_KAS}" ]; then
+if [ -n "${PRIVATE_KAS:-}" ] && [ -f "${PRIVATE_KAS}" ]; then
     cp "${PRIVATE_KAS}" "${LOCAL_KAS}"
     exec kas build "${KAS_FILE}:${LOCAL_KAS}"
 else

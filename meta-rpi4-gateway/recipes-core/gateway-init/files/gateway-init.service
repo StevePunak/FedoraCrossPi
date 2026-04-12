@@ -1,0 +1,14 @@
+[Unit]
+Description=Gateway first-boot initialization (partitions, config)
+DefaultDependencies=no
+Before=local-fs-pre.target systemd-networkd.service dnsmasq.service nginx.service
+After=systemd-remount-fs.service
+ConditionPathExists=/usr/sbin/gateway-init.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/gateway-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
