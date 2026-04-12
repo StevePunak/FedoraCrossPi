@@ -4,7 +4,7 @@ set -euo pipefail
 TARGET="${1:-rpi4}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
-PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-private/kas/private.yml"
+PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-jukebox/kas/private.yml"
 LOCAL_KAS="${REPO_ROOT}/kas/local.yml"
 
 case "${TARGET}" in
