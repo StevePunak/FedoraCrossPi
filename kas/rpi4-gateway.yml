@@ -1,0 +1,62 @@
+header:
+  version: 14
+
+machine: raspberrypi4-64
+distro: poky
+target: rpi4-gateway-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: walnascar
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded
+    branch: walnascar
+    layers:
+      meta-oe:
+      meta-networking:
+      meta-python:
+      meta-webserver:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi
+    branch: walnascar
+    layers:
+      .:
+
+  meta-rpi4-gateway:
+    path: meta-rpi4-gateway
+    layers:
+      .:
+
+local_conf_header:
+  meta-rpi4-gateway: |
+    # Init system
+    INIT_MANAGER = "systemd"
+
+    # Headless network appliance — no display, no audio
+    DISTRO_FEATURES:remove = "x11 directfb vulkan wayland opengl"
+    DISTRO_FEATURES:append = " pam"
+
+    # RPi 4 — minimal GPU memory for headless
+    GPU_MEM = "16"
+    ENABLE_UART = "1"
+
+    # Accept restricted licenses required for RPi WiFi/BT firmware
+    LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
+
+    # Shared caches
+    DL_DIR ?= "${TOPDIR}/../downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+
+    # Auto-clean work directories after each package builds
+    INHERIT += "rm_work"
+
+    # Parallelism — 48 cores
+    BB_NUMBER_THREADS = "48"
+    PARALLEL_MAKE = "-j 48"
