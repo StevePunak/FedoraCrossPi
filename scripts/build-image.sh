@@ -26,6 +26,15 @@ case "${TARGET}" in
   *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway]" >&2; exit 1 ;;
 esac
 
+# Build the admin UI frontend bundle before the gateway image (recipe copies dist/)
+if [ "${TARGET}" = "gateway" ] || [ "${TARGET}" = "qemu-gateway" ]; then
+    FRONTEND_DIR="${REPO_ROOT}/gateway-admin/frontend"
+    if [ -d "${FRONTEND_DIR}" ]; then
+        echo "Building admin UI frontend..."
+        (cd "${FRONTEND_DIR}" && npm install --silent && npm run build)
+    fi
+fi
+
 if [ -n "${PRIVATE_KAS:-}" ] && [ -f "${PRIVATE_KAS}" ]; then
     cp "${PRIVATE_KAS}" "${LOCAL_KAS}"
     exec kas build "${KAS_FILE}:${LOCAL_KAS}"

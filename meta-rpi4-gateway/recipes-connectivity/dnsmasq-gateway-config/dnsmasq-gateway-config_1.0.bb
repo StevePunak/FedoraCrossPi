@@ -7,7 +7,7 @@ RDEPENDS:${PN} = "dnsmasq"
 do_install() {
     # Enable dnsmasq service via preset
     install -d ${D}${libdir}/systemd/system-preset
-    printf 'enable dnsmasq.service\n' \
+    printf 'disable dnsmasq.service\n' \
         > ${D}${libdir}/systemd/system-preset/91-dnsmasq.preset
 }
 

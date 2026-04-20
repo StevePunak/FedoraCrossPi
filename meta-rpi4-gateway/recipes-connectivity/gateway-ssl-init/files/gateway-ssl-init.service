@@ -1,0 +1,14 @@
+[Unit]
+Description=Generate self-signed TLS cert for gateway admin UI
+After=gateway-init.service data.mount systemd-networkd-wait-online.service
+Requires=data.mount
+Before=nginx.service
+ConditionPathExists=/usr/sbin/gateway-ssl-init.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/gateway-ssl-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

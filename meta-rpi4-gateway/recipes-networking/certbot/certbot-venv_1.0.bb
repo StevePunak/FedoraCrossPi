@@ -4,23 +4,24 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 RDEPENDS:${PN} = "python3 python3-venv python3-pip openssl-bin nginx"
 
+SRC_URI = " \
+    file://certbot-setup.sh \
+    file://certbot-wrapper.sh \
+    file://certbot-setup.service \
+    file://certbot-renew.service \
+    file://certbot-renew.timer \
+"
+
 do_install() {
-    # Setup script — creates venv and pip-installs certbot on first boot
     install -d ${D}${sbindir}
-    install -m 0755 ${THISDIR}/files/certbot-setup.sh ${D}${sbindir}/certbot-setup.sh
+    install -m 0755 ${UNPACKDIR}/certbot-setup.sh ${D}${sbindir}/certbot-setup.sh
+    install -m 0755 ${UNPACKDIR}/certbot-wrapper.sh ${D}${sbindir}/certbot
 
-    # Wrapper so 'certbot' works from PATH after setup completes
-    install -m 0755 ${THISDIR}/files/certbot-wrapper.sh ${D}${sbindir}/certbot
-
-    # First-boot setup service
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${THISDIR}/files/certbot-setup.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/certbot-setup.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/certbot-renew.service ${D}${systemd_system_unitdir}/
+    install -m 0644 ${UNPACKDIR}/certbot-renew.timer ${D}${systemd_system_unitdir}/
 
-    # Renewal timer and service
-    install -m 0644 ${THISDIR}/files/certbot-renew.service ${D}${systemd_system_unitdir}/
-    install -m 0644 ${THISDIR}/files/certbot-renew.timer ${D}${systemd_system_unitdir}/
-
-    # Enable via presets
     install -d ${D}${libdir}/systemd/system-preset
     printf 'enable certbot-setup.service\nenable certbot-renew.timer\n' \
         > ${D}${libdir}/systemd/system-preset/91-certbot.preset

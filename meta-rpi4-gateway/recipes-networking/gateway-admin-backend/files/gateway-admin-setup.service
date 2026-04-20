@@ -1,0 +1,15 @@
+[Unit]
+Description=Install gateway-admin Python dependencies on first boot
+After=network-online.target
+Wants=network-online.target
+Before=gateway-admin.service
+ConditionPathExists=!/opt/gateway-admin/.venv/bin/uvicorn
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/gateway-admin-setup.sh
+RemainAfterExit=yes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

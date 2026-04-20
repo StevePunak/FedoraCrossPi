@@ -16,4 +16,7 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/02-dhcp.conf ${D}${sysconfdir}/dnsmasq.d/
 }
 
+# Don't auto-enable during development — conflicts with feyd's DHCP server
+SYSTEMD_AUTO_ENABLE = "disable"
+
 FILES:${PN} += "${sysconfdir}/dnsmasq.d/"

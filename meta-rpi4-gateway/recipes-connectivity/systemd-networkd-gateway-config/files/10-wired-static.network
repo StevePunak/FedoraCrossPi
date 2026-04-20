@@ -2,10 +2,6 @@
 Type=ether
 
 [Network]
-# Override these in private overlay with real network values
-Address=192.168.1.1/24
-DNS=127.0.0.1
+# DHCP during development — switch to static when deploying as gateway
+DHCP=yes
 MulticastDNS=yes
-
-[Route]
-Gateway=192.168.1.254

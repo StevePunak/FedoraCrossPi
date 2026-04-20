@@ -1,0 +1,16 @@
+[Unit]
+Description=Gateway admin backend (FastAPI)
+After=network-online.target gateway-admin-setup.service data.mount
+Requires=data.mount
+ConditionPathExists=/opt/gateway-admin/.venv/bin/uvicorn
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/gateway-admin
+Environment=GATEWAY_DATA_DIR=/data
+ExecStart=/opt/gateway-admin/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

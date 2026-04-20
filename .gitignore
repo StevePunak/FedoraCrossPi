@@ -15,3 +15,15 @@ meta-raspberrypi/
 *.swp
 .vscode/
 kas/local.yml
+
+# gateway-admin dev artifacts
+gateway-admin/backend/.venv/
+gateway-admin/backend/app/data/
+gateway-admin/frontend/node_modules/
+gateway-admin/frontend/dist/
+__pycache__/
+*.pyc
+
+# Private layers
+meta-rpi4-private/
+meta-rpi4-gateway-private/

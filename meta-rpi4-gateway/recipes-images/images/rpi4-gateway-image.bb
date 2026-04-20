@@ -41,6 +41,9 @@ IMAGE_INSTALL:append = " \
     wpa-supplicant \
     systemd-networkd-gateway-config \
     gateway-init \
+    gateway-ssl-init \
+    gateway-admin-backend \
+    gateway-admin-frontend \
 "
 
 # Include SSH and allow passwordless root login (development image)
