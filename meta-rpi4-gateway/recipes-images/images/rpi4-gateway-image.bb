@@ -20,6 +20,7 @@ IMAGE_INSTALL:append = " \
     tar \
     bash \
     shadow \
+    sudo \
     rsync \
     dnf \
     python3 \
@@ -46,15 +47,48 @@ IMAGE_INSTALL:append = " \
     gateway-admin-frontend \
 "
 
-# Include SSH and allow passwordless root login (development image)
-IMAGE_FEATURES += "ssh-server-openssh allow-root-login empty-root-password package-management"
+# SSH only (no debug-tweaks, no root login, no empty password)
+IMAGE_FEATURES += "ssh-server-openssh package-management"
 
 # Package manager
 PACKAGE_CLASSES = "package_rpm"
 
-# Install root SSH public key
-install_root_ssh_key() {
-    install -d -m 700 ${IMAGE_ROOTFS}/root/.ssh
-    install -m 600 ${THISDIR}/files/authorized_keys ${IMAGE_ROOTFS}/root/.ssh/authorized_keys
+# Create the 'gateway' sudo user at build time. Default password is 'gateway' —
+# change it with `passwd` after first login. Root account is locked so
+# passwordless / single-user recovery requires physically reflashing.
+inherit extrausers
+GATEWAY_UID = "1000"
+GATEWAY_GID = "1000"
+# SHA-512 crypt of "gateway" (salt: stilgar). Change on first login with `passwd`.
+GATEWAY_PW_HASH = "\$6\$stilgar\$a965cRXTOIY.2QOBntpnGJkfB8Q4/Z1Kc4rNyMXRL1Zu2v0XkfZ7LYRa1xyfpb.Qa8fco.8D19qocdLr4drwh/"
+EXTRA_USERS_PARAMS = " \
+    groupadd -r -f wheel; \
+    useradd -m -u ${GATEWAY_UID} -U -s /bin/bash -G wheel -p '${GATEWAY_PW_HASH}' gateway; \
+    usermod -L root; \
+"
+
+# sudoers: wheel group members can sudo (password required)
+install_sudoers() {
+    install -d -m 750 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d
+    printf '%%wheel ALL=(ALL) ALL\n' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/wheel
+    chmod 0440 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/wheel
 }
-ROOTFS_POSTPROCESS_COMMAND += "install_root_ssh_key;"
+
+# SSH: disable root login explicitly via drop-in config
+disable_root_ssh() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/ssh/sshd_config.d
+    printf 'PermitRootLogin no\nPermitEmptyPasswords no\n' \
+        > ${IMAGE_ROOTFS}${sysconfdir}/ssh/sshd_config.d/10-harden.conf
+}
+
+# Install SSH public key into the gateway user's home
+install_gateway_ssh_key() {
+    install -d -m 700 ${IMAGE_ROOTFS}/home/gateway/.ssh
+    install -m 600 ${THISDIR}/files/authorized_keys \
+        ${IMAGE_ROOTFS}/home/gateway/.ssh/authorized_keys
+    # useradd -m creates the home dir owned by the user; chown to match
+    # Host `chown` doesn't know target-side users/groups; use numeric IDs.
+    chown -R ${GATEWAY_UID}:${GATEWAY_GID} ${IMAGE_ROOTFS}/home/gateway/.ssh
+}
+
+ROOTFS_POSTPROCESS_COMMAND += "install_sudoers; disable_root_ssh; install_gateway_ssh_key;"

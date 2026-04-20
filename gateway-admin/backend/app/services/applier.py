@@ -37,6 +37,18 @@ def _write(path: Path, content: str):
     path.write_text(content)
 
 
+def _ensure_symlink(target: Path, link: Path):
+    """Ensure `link` is a symlink pointing at `target`. No-op in dev mode."""
+    if not _is_production():
+        return
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if link.is_symlink() or link.exists():
+        if link.is_symlink() and link.readlink() == target:
+            return
+        link.unlink()
+    link.symlink_to(target)
+
+
 def _systemctl(*args: str) -> tuple[int, str]:
     try:
         result = subprocess.run(
@@ -98,11 +110,13 @@ def apply_dhcp(config: DhcpConfig, leases: list[StaticLease]) -> dict:
         leases_path = _data_dir() / "dnsmasq.d" / "03-static-leases.conf"
         _write(dhcp_path, dhcp_content)
         _write(leases_path, leases_content)
+        _ensure_symlink(dhcp_path, Path("/etc/dnsmasq.d/02-dhcp.conf"))
+        _ensure_symlink(leases_path, Path("/etc/dnsmasq.d/03-static-leases.conf"))
 
         # Enable/disable the service based on config
         if config.enabled:
             _systemctl("enable", "--now", "dnsmasq")
-            _systemctl("reload-or-restart", "dnsmasq")
+            _systemctl("restart", "dnsmasq")
         else:
             _systemctl("disable", "--now", "dnsmasq")
 
@@ -128,11 +142,13 @@ def apply_dns(config: DnsConfig, entries: list[HostEntry]) -> dict:
         hosts_path = _data_dir() / "dnsmasq.d" / "04-hosts.conf"
         _write(dns_path, dns_content)
         _write(hosts_path, hosts_content)
+        _ensure_symlink(dns_path, Path("/etc/dnsmasq.d/01-dns.conf"))
+        _ensure_symlink(hosts_path, Path("/etc/dnsmasq.d/04-hosts.conf"))
 
         # Only reload if dnsmasq is running (otherwise no-op)
         is_active, _ = _systemctl("is-active", "dnsmasq")
         if is_active == 0:
-            _systemctl("reload-or-restart", "dnsmasq")
+            _systemctl("restart", "dnsmasq")
 
         result["applied"] = True
         result["paths"] = [str(dns_path), str(hosts_path)]
