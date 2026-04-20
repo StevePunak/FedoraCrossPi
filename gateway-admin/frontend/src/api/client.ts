@@ -1,15 +1,25 @@
-// In production, nginx serves the UI and proxies /api/* to the backend.
-// In dev (Vite on :5173), point at the FastAPI server on :8000.
-const API_BASE = import.meta.env.DEV
-  ? `http://${window.location.hostname}:8000/api`
-  : "/api";
+// Both prod (nginx reverse proxy) and dev (Vite proxy) serve /api on the
+// same origin as the UI, so this can always be relative.
+const API_BASE = "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  // 401s on non-auth endpoints mean the session expired — signal a redirect.
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+  }
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body.detail) detail = body.detail;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   return res.json();
 }
 
@@ -76,7 +86,31 @@ export interface SystemInfo {
   disk_used: string;
 }
 
+export interface AuthStatus {
+  authenticated: boolean;
+  bootstrap: boolean;
+  username: string | null;
+  dev_bypass: boolean;
+}
+
 export const api = {
+  getAuthStatus: () => request<AuthStatus>("/auth/status"),
+  bootstrap: (username: string, password: string) =>
+    request<{ status: string; username: string }>("/auth/bootstrap", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  login: (username: string, password: string) =>
+    request<{ status: string; username: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  logout: () => request<{ status: string }>("/auth/logout", { method: "POST" }),
+  changePassword: (current_password: string, new_password: string) =>
+    request("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password }),
+    }),
   getSystem: () => request<SystemInfo>("/system"),
   getNetwork: () => request<NetworkConfig>("/network"),
   updateNetwork: (c: NetworkConfig) =>

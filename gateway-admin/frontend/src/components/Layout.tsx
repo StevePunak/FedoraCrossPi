@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
@@ -32,7 +33,20 @@ const activeStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
+const logoutBtnStyle: React.CSSProperties = {
+  margin: "16px 24px 0",
+  padding: "8px 12px",
+  background: "transparent",
+  border: "1px solid #636e72",
+  color: "#dfe6e9",
+  borderRadius: 4,
+  fontSize: 13,
+  cursor: "pointer",
+};
+
 export default function Layout() {
+  const { status, logout } = useAuth();
+
   return (
     <div style={{ display: "flex" }}>
       <nav style={navStyle}>
@@ -49,6 +63,18 @@ export default function Layout() {
             {item.label}
           </NavLink>
         ))}
+        <div style={{ flex: 1 }} />
+        {status?.username && (
+          <div style={{ padding: "0 24px", fontSize: 13, color: "#b2bec3" }}>
+            Signed in as <strong style={{ color: "#dfe6e9" }}>{status.username}</strong>
+          </div>
+        )}
+        {!status?.dev_bypass && (
+          <button style={logoutBtnStyle} onClick={logout}>
+            Sign Out
+          </button>
+        )}
+        <div style={{ height: 24 }} />
       </nav>
       <main style={{ flex: 1, padding: 32 }}>
         <Outlet />

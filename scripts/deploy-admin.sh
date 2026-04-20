@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-HOST="${1:-192.168.0.82}"
+HOST="${1:-192.168.0.2}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
 KEY="${HOME}/.ssh/rpi4-key"
