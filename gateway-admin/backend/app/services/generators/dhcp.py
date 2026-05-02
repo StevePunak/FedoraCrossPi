@@ -15,8 +15,8 @@ def generate_dhcp(config: DhcpConfig) -> str:
 
     if config.router:
         lines.append(f"dhcp-option=option:router,{config.router}")
-    if config.dns_server:
-        lines.append(f"dhcp-option=option:dns-server,{config.dns_server}")
+    if config.dns_servers:
+        lines.append(f"dhcp-option=option:dns-server,{','.join(config.dns_servers)}")
     if config.domain:
         lines.append(f"dhcp-option=option:domain-name,{config.domain}")
     if config.domain_search:

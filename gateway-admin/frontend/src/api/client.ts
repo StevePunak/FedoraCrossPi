@@ -40,7 +40,7 @@ export interface DhcpConfig {
   netmask: string;
   lease_time: string;
   router: string;
-  dns_server: string;
+  dns_servers: string[];
   domain: string;
   domain_search: string[];
   ntp_servers: string[];

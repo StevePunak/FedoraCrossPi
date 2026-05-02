@@ -114,9 +114,9 @@ export default function DNS() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr>
-              <th style={thStyle}>IP Address</th>
+              <th style={{ ...thStyle, width: 150 }}>IP Address</th>
               <th style={thStyle}>Hostnames</th>
-              <th style={{ ...thStyle, width: 80 }}></th>
+              <th style={{ ...thStyle, width: 100, textAlign: "right" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +124,7 @@ export default function DNS() {
               <tr key={idx}>
                 <td style={tdStyle}>{entry.ip}</td>
                 <td style={tdStyle}><code>{entry.hostnames.join(", ")}</code></td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, textAlign: "right" }}>
                   <button style={dangerBtn} onClick={() => removeHost(idx)}>Remove</button>
                 </td>
               </tr>

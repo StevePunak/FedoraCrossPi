@@ -139,8 +139,12 @@ export default function DHCP() {
           <FormField label="Router (Gateway)">
             <input style={inputStyle} value={config.router} onChange={(e) => updateConfig("router", e.target.value)} />
           </FormField>
-          <FormField label="DNS Server">
-            <input style={inputStyle} value={config.dns_server} onChange={(e) => updateConfig("dns_server", e.target.value)} />
+          <FormField label="DNS Servers (comma-separated; first is primary)">
+            <input
+              style={inputStyle}
+              value={config.dns_servers.join(", ")}
+              onChange={(e) => updateConfig("dns_servers", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+            />
           </FormField>
           <FormField label="Domain Name">
             <input style={inputStyle} value={config.domain} onChange={(e) => updateConfig("domain", e.target.value)} />
@@ -191,7 +195,7 @@ export default function DHCP() {
               <th style={thStyle}>IP Address</th>
               <th style={thStyle}>Hostname</th>
               <th style={thStyle}>Comment</th>
-              <th style={{ ...thStyle, width: 80 }}></th>
+              <th style={{ ...thStyle, width: 100, textAlign: "right" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -216,7 +220,7 @@ export default function DHCP() {
                 <td style={tdStyle}>
                   <input style={inputStyle} value={lease.comment} onChange={(e) => updateLease(idx, "comment", e.target.value)} placeholder="optional" />
                 </td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, textAlign: "right" }}>
                   <button style={dangerBtn} onClick={() => removeLease(idx)}>Remove</button>
                 </td>
               </tr>

@@ -57,7 +57,7 @@ def _seed_defaults():
         netmask="255.255.255.0",
         lease_time="24h",
         router="192.168.0.1",
-        dns_server="192.168.0.51",
+        dns_servers=["192.168.0.51", "8.8.8.8"],
         domain="punak.com",
         domain_search=["punak.com"],
         ntp_servers=["192.168.0.51"],

@@ -44,7 +44,7 @@ def parse_dhcp_conf(text: str) -> tuple[dict, list[dict]]:
         "netmask": "255.255.255.0",
         "lease_time": "24h",
         "router": "",
-        "dns_server": "",
+        "dns_servers": [],
         "domain": "",
         "domain_search": [],
         "ntp_servers": [],
@@ -82,7 +82,7 @@ def parse_dhcp_conf(text: str) -> tuple[dict, list[dict]]:
                 if name == "router":
                     dhcp["router"] = val
                 elif name == "dns-server":
-                    dhcp["dns_server"] = val
+                    dhcp["dns_servers"] = [s.strip() for s in val.split(",") if s.strip()]
                 elif name == "domain-name":
                     dhcp["domain"] = val
                 elif name == "domain-search":
@@ -210,7 +210,7 @@ def main():
     print(f"\nParsed {len(leases)} static leases, {len(host_entries)} host entries")
     print(f"DHCP range:  {dhcp_cfg['range_start']} - {dhcp_cfg['range_end']}")
     print(f"Router:      {dhcp_cfg['router']}")
-    print(f"DNS server:  {dhcp_cfg['dns_server']}  (clients will use this for DNS)")
+    print(f"DNS servers: {', '.join(dhcp_cfg['dns_servers'])}  (clients will use these for DNS)")
     print(f"Domain:      {dhcp_cfg['domain']}")
     print(f"Upstream:    {', '.join(dns_cfg['upstream_servers'])}")
 

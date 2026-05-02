@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class NetworkConfig(BaseModel):
@@ -18,13 +18,24 @@ class DhcpConfig(BaseModel):
     netmask: str = "255.255.255.0"
     lease_time: str = "24h"
     router: str = ""
-    dns_server: str = ""
+    # First entry is the primary DNS clients use; remaining entries are
+    # fallbacks (e.g. 8.8.8.8) tried when the primary is down.
+    dns_servers: list[str] = []
     domain: str = ""
     domain_search: list[str] = []
     ntp_servers: list[str] = []
     mtu: int | None = None
     tftp_server: str = ""
     boot_filename: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_dns_server(cls, data):
+        # Accept legacy `dns_server` (str) from JSON written by older versions
+        if isinstance(data, dict) and "dns_server" in data and "dns_servers" not in data:
+            legacy = data.pop("dns_server")
+            data["dns_servers"] = [legacy] if legacy else []
+        return data
 
 
 class StaticLease(BaseModel):
