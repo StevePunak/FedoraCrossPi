@@ -2,11 +2,14 @@ from pydantic import BaseModel, model_validator
 
 
 class NetworkConfig(BaseModel):
-    mode: str = "dhcp"  # "dhcp" or "static"
-    address: str = ""
+    # Defaults match the static config shipped in the gateway image's
+    # systemd-networkd-gateway-config recipe so reconcile-on-startup is
+    # a no-op on a fresh appliance with no persisted network.json.
+    mode: str = "static"  # "dhcp" or "static"
+    address: str = "192.168.0.2"
     netmask: str = "255.255.255.0"
-    gateway: str = ""
-    dns: list[str] = []
+    gateway: str = "192.168.0.1"
+    dns: list[str] = ["8.8.8.8"]
     hostname: str = ""
 
 

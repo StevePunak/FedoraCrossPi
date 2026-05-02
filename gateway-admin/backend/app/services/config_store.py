@@ -45,7 +45,11 @@ def _seed_defaults():
     d.mkdir(parents=True, exist_ok=True)
 
     _write_json(d / "network.json", NetworkConfig(
-        mode="dhcp",
+        mode="static",
+        address="192.168.0.2",
+        netmask="255.255.255.0",
+        gateway="192.168.0.1",
+        dns=["8.8.8.8"],
         hostname="gateway",
     ).model_dump())
 

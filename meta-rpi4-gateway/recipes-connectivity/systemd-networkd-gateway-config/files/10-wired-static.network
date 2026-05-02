@@ -2,6 +2,13 @@
 Type=ether
 
 [Network]
-# DHCP during development — switch to static when deploying as gateway
-DHCP=yes
+# Static so a fresh-flashed appliance comes up reachable on its
+# deployed LAN without needing a DHCP server. Operator changes via
+# the admin UI; saved values land in /data/network/ and override
+# this file via the symlink gateway-init drops on first boot.
+Address=192.168.0.2/24
+DNS=8.8.8.8
 MulticastDNS=yes
+
+[Route]
+Gateway=192.168.0.1
