@@ -1,19 +1,34 @@
 #!/bin/sh
 # Gateway first-boot initialization:
-#   1. Expand rootfs (p2) leaving 512MB at end for config partition
-#   2. Create config partition (p3) if missing from partition table
-#   3. Format p3 only if it doesn't already have a valid filesystem
-#   4. Mount config partition at /data
-#   5. Seed default user-editable configs if /data is empty (first-ever boot)
-#   6. Symlink user-editable configs from /data into /etc
+#   1. If /data already has a valid ext4 fs, preserve it (just mount).
+#      Otherwise size rootfs (p2) to 2x its as-flashed size and devote
+#      everything past it to /data (p3).
+#   2. Mount config partition at /data
+#   3. Seed default user-editable configs if /data is empty (first-ever boot)
+#   4. Symlink user-editable configs from /data into /etc
 #
 # Note: nginx config is NOT stored in /data — it lives in /etc from the recipe
 # so that recipe updates propagate to the device on reflash. Only
 # user-editable configs (network, dnsmasq drop-ins, hostname) are persisted.
+#
+# Upgrade note: existing devices flashed before this layout (fixed 512MB
+# /data) keep their /data partition exactly as-is on reflash — the new
+# formula only fires on truly fresh SD cards with no /data filesystem.
+# To migrate an existing device to the larger /data layout: download a
+# backup via the admin UI, wipe the SD card partition table
+# (`wipefs -a /dev/sdX`), reflash, restore the backup.
 
 set -e
 
-CONFIG_SIZE_MB=512
+# Rootfs partition is sized to (as-flashed-rootfs-size * this factor) on
+# fresh SD cards. The remainder of the disk becomes /data. Bump the factor
+# to give the rootfs more growth room at the cost of /data space.
+ROOTFS_GROWTH_FACTOR=2
+
+# Bail rather than carve out a tiny /data; usually means the SD card is
+# too small for this image's persistent-data needs.
+MIN_DATA_MB=1024
+
 DATA_MOUNT="/data"
 
 ROOTDEV=$(findmnt -n -o SOURCE /)
@@ -33,38 +48,49 @@ if [ -z "${DISK}" ] || [ -z "${ROOT_PARTNUM}" ]; then
 fi
 
 DISK_DEV="/dev/${DISK}"
-DISK_SIZE_MB=$(blockdev --getsize64 "${DISK_DEV}" | awk '{printf "%d", $1/1024/1024}')
-ROOT_END_MB=$((DISK_SIZE_MB - CONFIG_SIZE_MB))
+DISK_SIZE_MB=$(($(blockdev --getsize64 "${DISK_DEV}") / 1024 / 1024))
 
 echo "gateway-init: disk=${DISK_DEV} size=${DISK_SIZE_MB}MB rootfs=p${ROOT_PARTNUM} config=p${CONFIG_PARTNUM}"
 
-# Step 1: Expand rootfs, leaving space for config partition
-echo "gateway-init: expanding rootfs to ${ROOT_END_MB}MB"
-parted -s "${DISK_DEV}" resizepart "${ROOT_PARTNUM}" "${ROOT_END_MB}MB"
-resize2fs "${ROOTDEV}"
-
-# Step 2: Create config partition if not in partition table
-if ! parted -s "${DISK_DEV}" print | grep -q "^ ${CONFIG_PARTNUM} "; then
-    echo "gateway-init: creating config partition (p${CONFIG_PARTNUM}, ${CONFIG_SIZE_MB}MB)"
-    parted -s "${DISK_DEV}" mkpart primary ext4 "${ROOT_END_MB}MB" 100%
-    partprobe "${DISK_DEV}"
-    sleep 1
-fi
-
-# Step 3: Format only if no valid ext4 filesystem exists
-if blkid "${CONFIG_DEV}" | grep -q 'TYPE="ext4"'; then
-    echo "gateway-init: existing ext4 filesystem found on ${CONFIG_DEV}, preserving data"
+if blkid "${CONFIG_DEV}" 2>/dev/null | grep -q 'TYPE="ext4"'; then
+    # Existing /data on this card — leave the layout alone, just fsck and mount.
+    echo "gateway-init: existing /data on ${CONFIG_DEV}, preserving layout"
     e2fsck -y "${CONFIG_DEV}" || true
 else
-    echo "gateway-init: formatting ${CONFIG_DEV} as ext4"
+    # Fresh card: double the rootfs partition, give the rest to /data.
+    ROOT_SIZE_MB=$(($(blockdev --getsize64 "${ROOTDEV}") / 1024 / 1024))
+    ROOT_START_SECTORS=$(cat "/sys/class/block/$(basename "${ROOTDEV}")/start")
+    ROOT_START_MB=$((ROOT_START_SECTORS / 2048))
+    NEW_ROOT_SIZE_MB=$((ROOT_SIZE_MB * ROOTFS_GROWTH_FACTOR))
+    NEW_ROOT_END_MB=$((ROOT_START_MB + NEW_ROOT_SIZE_MB))
+    DATA_SIZE_MB=$((DISK_SIZE_MB - NEW_ROOT_END_MB))
+
+    if [ "${DATA_SIZE_MB}" -lt "${MIN_DATA_MB}" ]; then
+        echo "gateway-init: SD card too small (${DISK_SIZE_MB}MB) — doubling rootfs to ${NEW_ROOT_SIZE_MB}MB would leave only ${DATA_SIZE_MB}MB for /data (need >=${MIN_DATA_MB}MB)" >&2
+        exit 1
+    fi
+
+    echo "gateway-init: rootfs ${ROOT_SIZE_MB}MB->${NEW_ROOT_SIZE_MB}MB, /data ${DATA_SIZE_MB}MB"
+
+    # Drop a stale p3 entry if one exists (no valid fs, so nothing to lose).
+    if parted -s "${DISK_DEV}" print | grep -q "^ ${CONFIG_PARTNUM} "; then
+        parted -s "${DISK_DEV}" rm "${CONFIG_PARTNUM}"
+    fi
+
+    parted -s "${DISK_DEV}" resizepart "${ROOT_PARTNUM}" "${NEW_ROOT_END_MB}MB"
+    resize2fs "${ROOTDEV}"
+
+    parted -s "${DISK_DEV}" mkpart primary ext4 "${NEW_ROOT_END_MB}MB" 100%
+    partprobe "${DISK_DEV}"
+    sleep 1
+
     mkfs.ext4 -L gateway-config -q "${CONFIG_DEV}"
 fi
 
-# Step 4: Mount config partition
 mkdir -p "${DATA_MOUNT}"
 mount "${CONFIG_DEV}" "${DATA_MOUNT}"
 
-# Step 5: Seed default user-editable configs on first-ever boot
+# Seed default user-editable configs on first-ever boot
 if [ ! -f "${DATA_MOUNT}/.initialized" ]; then
     echo "gateway-init: first boot — seeding default configuration"
 
@@ -91,7 +117,7 @@ fi
 mkdir -p "${DATA_MOUNT}/ssl"
 chmod 700 "${DATA_MOUNT}/ssl"
 
-# Step 6: Activate user-editable configs from /data
+# Activate user-editable configs from /data
 echo "gateway-init: activating configuration from ${DATA_MOUNT}"
 
 # dnsmasq drop-ins
