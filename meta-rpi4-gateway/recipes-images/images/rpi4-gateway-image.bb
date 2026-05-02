@@ -67,10 +67,14 @@ EXTRA_USERS_PARAMS = " \
     usermod -L root; \
 "
 
-# sudoers: wheel group members can sudo (password required)
+# sudoers: wheel group members can sudo without a password.
+# Risk model: SSH is key-only and root login is disabled, so an attacker
+# already needs the gateway user's SSH key to land here. Requiring a sudo
+# password on top doesn't add meaningful security but breaks unattended
+# deploy/maintenance scripts.
 install_sudoers() {
     install -d -m 750 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d
-    printf '%%wheel ALL=(ALL) ALL\n' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/wheel
+    printf '%%wheel ALL=(ALL) NOPASSWD: ALL\n' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/wheel
     chmod 0440 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/wheel
 }
 
