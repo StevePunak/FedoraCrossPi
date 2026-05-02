@@ -7,6 +7,7 @@ const navItems = [
   { to: "/dhcp", label: "DHCP" },
   { to: "/dns", label: "DNS" },
   { to: "/services", label: "Services" },
+  { to: "/apps", label: "Apps" },
   { to: "/backup", label: "Backup" },
 ];
 

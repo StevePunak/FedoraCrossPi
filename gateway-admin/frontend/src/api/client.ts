@@ -93,6 +93,90 @@ export interface AuthStatus {
   dev_bypass: boolean;
 }
 
+// ---- Apps ----
+
+export interface CompatibilitySpec {
+  target_arch: "aarch64";
+  min_appliance_version: string;
+}
+
+export interface AppServiceSpec {
+  name: string;
+  exec: string;
+  args: string[];
+  working_dir: string | null;
+  user: string | null;
+  requires: string[];
+  restart: "no" | "on-failure" | "always";
+  type: "simple" | "forking" | "notify";
+  environment: Record<string, string>;
+}
+
+export interface AppWebUiSpec {
+  service: string;
+  port: number;
+  path: string | null;
+  strip_prefix: boolean;
+  requires_admin: boolean;
+}
+
+export interface AppConfigField {
+  key: string;
+  label: string;
+  type: "string" | "int" | "bool" | "select" | "password" | "path";
+  default: string | number | boolean | null;
+  required: boolean;
+  description: string | null;
+  choices: string[] | null;
+  min: number | null;
+  max: number | null;
+  secret: boolean;
+}
+
+export interface AppHooksSpec {
+  pre_install: string | null;
+  post_install: string | null;
+  pre_uninstall: string | null;
+}
+
+export interface AppHealthSpec {
+  service: string;
+  url: string;
+  expected_status: number;
+  interval_seconds: number;
+}
+
+export interface AppManifest {
+  schema_version: 1;
+  id: string;
+  name: string;
+  version: string;
+  description: string | null;
+  vendor: string | null;
+  compatibility: CompatibilitySpec;
+  services: AppServiceSpec[];
+  web_ui: AppWebUiSpec | null;
+  data_dirs: string[];
+  config: AppConfigField[];
+  hooks: AppHooksSpec;
+  health: AppHealthSpec | null;
+}
+
+export interface InstalledApp {
+  id: string;
+  version: string;
+  manifest: AppManifest;
+  config_values: Record<string, string | number | boolean>;
+  installed_at: string;
+  enabled: boolean;
+  archive_sha256: string;
+}
+
+export interface AppDetail {
+  app: InstalledApp;
+  status: Record<string, string>;
+}
+
 export const api = {
   getAuthStatus: () => request<AuthStatus>("/auth/status"),
   bootstrap: (username: string, password: string) =>
@@ -177,4 +261,48 @@ export const api = {
     }
     return res.json() as Promise<{ status: string; restored: number; files: string[] }>;
   },
+  listApps: () => request<InstalledApp[]>("/apps"),
+  getApp: (id: string) => request<AppDetail>(`/apps/${id}`),
+  preflightApp: async (file: File): Promise<AppManifest> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/apps/preflight", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  },
+  installApp: async (file: File, configValues: Record<string, unknown>): Promise<InstalledApp> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("config", JSON.stringify(configValues));
+    const res = await fetch("/api/apps", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json();
+  },
+  uninstallApp: (id: string) =>
+    request<{ status: string }>(`/apps/${id}`, { method: "DELETE" }),
+  updateAppConfig: (id: string, configValues: Record<string, unknown>) =>
+    request<InstalledApp>(`/apps/${id}/config`, {
+      method: "PUT",
+      body: JSON.stringify(configValues),
+    }),
+  controlApp: (id: string, action: "start" | "stop" | "restart") =>
+    request<{ status: string }>(`/apps/${id}/${action}`, { method: "POST" }),
+  getAppStatus: (id: string) =>
+    request<Record<string, string>>(`/apps/${id}/status`),
 };

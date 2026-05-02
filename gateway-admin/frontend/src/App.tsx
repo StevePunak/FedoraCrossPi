@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import Apps from "./pages/Apps";
 import Backup from "./pages/Backup";
 import Bootstrap from "./pages/Bootstrap";
 import DHCP from "./pages/DHCP";
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/dhcp" element={<DHCP />} />
           <Route path="/dns" element={<DNS />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/apps" element={<Apps />} />
           <Route path="/backup" element={<Backup />} />
         </Route>
       </Routes>
