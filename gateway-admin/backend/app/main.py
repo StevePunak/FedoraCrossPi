@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 
-from app.routers import auth, dhcp, dns, network, services, system
+from app.routers import auth, backup, dhcp, dns, network, services, system
 from app.routers.auth import require_auth
 from app.services import applier, config_store
 
@@ -62,3 +62,4 @@ app.include_router(dhcp.router, dependencies=protected)
 app.include_router(dns.router, dependencies=protected)
 app.include_router(services.router, dependencies=protected)
 app.include_router(system.router, dependencies=protected)
+app.include_router(backup.router, dependencies=protected)

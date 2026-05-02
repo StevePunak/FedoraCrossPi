@@ -145,4 +145,36 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ config, hosts }),
     }),
+  downloadBackup: async (includeSecrets: boolean, passphrase: string) => {
+    const form = new FormData();
+    form.append("include_secrets", String(includeSecrets));
+    if (passphrase) form.append("passphrase", passphrase);
+    const res = await fetch("/api/backup", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.blob();
+  },
+  restoreBackup: async (file: File, passphrase: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (passphrase) form.append("passphrase", passphrase);
+    const res = await fetch("/api/backup/restore", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<{ status: string; restored: number; files: string[] }>;
+  },
 };
