@@ -45,6 +45,13 @@ def require_auth(request: Request) -> str:
     return username
 
 
+@router.get("/check")
+def check(_: str = Depends(require_auth)):
+    """Cheap auth probe used by nginx auth_request when fronting installed apps.
+    Returns 204 if authenticated, 401 otherwise (raised by require_auth)."""
+    return Response(status_code=204)
+
+
 @router.get("/status")
 def status(request: Request):
     token = request.cookies.get(SESSION_COOKIE)

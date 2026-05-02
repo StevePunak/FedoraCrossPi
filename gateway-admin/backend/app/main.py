@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI
 
 from app.routers import auth, backup, dhcp, dns, network, services, system
 from app.routers.auth import require_auth
-from app.services import applier, config_store
+from app.services import app_installer, applier, config_store
 
 log = logging.getLogger("gateway-admin")
 
@@ -36,6 +36,12 @@ def _reconcile_on_startup():
         applier.apply_network(config_store.get_network_config())
     except Exception:
         log.exception("network reconciliation failed")
+    try:
+        actions = app_installer.reconcile()
+        for action in actions:
+            log.info("apps: %s", action)
+    except Exception:
+        log.exception("app reconciliation failed")
 
 
 @asynccontextmanager
