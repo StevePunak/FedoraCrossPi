@@ -23,6 +23,7 @@ IMAGE_INSTALL:append = " \
     sudo \
     rsync \
     cifs-utils \
+    curl \
     dnf \
     python3 \
     python3-venv \
