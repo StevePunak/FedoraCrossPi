@@ -73,41 +73,68 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
     install_dir = APPS_DIR / manifest.id
     user = f"app-{manifest.id}"
 
+    # Sweep any orphan state from a previous failed install of this id so
+    # the retry isn't blocked by stale dirs/units/drop-ins.
+    _rollback(manifest, install_dir)
+
     install_dir.mkdir(parents=True, exist_ok=False)
-    _extract_archive(archive_bytes, install_dir)
-    _ensure_user(user)
 
-    for sub in manifest.data_dirs:
-        (install_dir / sub).mkdir(parents=True, exist_ok=True)
+    try:
+        _extract_archive(archive_bytes, install_dir)
+        _ensure_user(user)
 
-    _run("chown", "-R", f"{user}:{user}", str(install_dir))
+        for sub in manifest.data_dirs:
+            (install_dir / sub).mkdir(parents=True, exist_ok=True)
 
-    record = InstalledApp(
-        id=manifest.id,
-        version=manifest.version,
-        manifest=manifest,
-        config_values=merged_config,
-        installed_at=datetime.now(timezone.utc),
-        enabled=True,
-        archive_sha256=sha256,
-    )
+        _run("chown", "-R", f"{user}:{user}", str(install_dir))
 
-    _run_hook(manifest, install_dir, "pre_install", merged_config)
-    _write_config_env(record)
-    _write_systemd_units(record)
-    _write_nginx_drop_in(record)
+        record = InstalledApp(
+            id=manifest.id,
+            version=manifest.version,
+            manifest=manifest,
+            config_values=merged_config,
+            installed_at=datetime.now(timezone.utc),
+            enabled=True,
+            archive_sha256=sha256,
+        )
 
-    _systemctl("daemon-reload")
+        _run_hook(manifest, install_dir, "pre_install", merged_config)
+        _write_config_env(record)
+        _write_systemd_units(record)
+        _write_nginx_drop_in(record)
+
+        _systemctl("daemon-reload")
+        for svc in manifest.services:
+            unit = app_systemd.unit_name(manifest.id, svc.name)
+            _systemctl("enable", "--now", unit)
+        if manifest.web_ui is not None:
+            _run("nginx", "-s", "reload", check=False)
+
+        _run_hook(manifest, install_dir, "post_install", merged_config)
+
+        app_store.upsert(record)
+        return record
+    except Exception:
+        _rollback(manifest, install_dir)
+        raise
+
+
+def _rollback(manifest: AppManifest, install_dir: Path) -> None:
+    """Remove anything install() may have created for this app id. Safe to
+    run even if nothing exists yet — every step is missing_ok / check=False."""
     for svc in manifest.services:
         unit = app_systemd.unit_name(manifest.id, svc.name)
-        _systemctl("enable", "--now", unit)
-    if manifest.web_ui is not None:
+        _systemctl("disable", "--now", unit, check=False)
+        (SYSTEMD_DIR / unit).unlink(missing_ok=True)
+    _systemctl("daemon-reload", check=False)
+
+    nginx_path = Path(app_nginx.conf_path(manifest.id))
+    if nginx_path.exists():
+        nginx_path.unlink()
         _run("nginx", "-s", "reload", check=False)
 
-    _run_hook(manifest, install_dir, "post_install", merged_config)
-
-    app_store.upsert(record)
-    return record
+    if install_dir.exists():
+        shutil.rmtree(install_dir, ignore_errors=True)
 
 
 def uninstall(app_id: str) -> None:
@@ -308,7 +335,11 @@ def _validate_config(manifest: AppManifest, config_values: dict) -> dict:
 
 
 def _extract_archive(archive_bytes: bytes, dest: Path) -> None:
-    """Extract a tar.gz to dest with path-traversal + symlink guards."""
+    """Extract a tar.gz to dest. Path-traversal is enforced explicitly here
+    plus belt-and-suspenders by tarfile's `data` extraction filter, which
+    also rejects symlinks pointing outside the destination, special device
+    files, and absolute paths. Real-world apps need internal symlinks
+    (libfoo.so -> libfoo.so.1.2.3, etc.), so we don't reject them outright."""
     dest_resolved = dest.resolve()
     try:
         tf = tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz")
@@ -323,8 +354,6 @@ def _extract_archive(archive_bytes: bytes, dest: Path) -> None:
             target.relative_to(dest_resolved)
         except ValueError as e:
             raise InstallError(f"archive escapes install dir: {member.name!r}") from e
-        if member.issym() or member.islnk():
-            raise InstallError(f"archive contains symlinks: {member.name!r}")
 
     tf.extractall(dest, filter="data")
 
