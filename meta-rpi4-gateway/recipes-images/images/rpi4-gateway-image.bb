@@ -22,6 +22,7 @@ IMAGE_INSTALL:append = " \
     shadow \
     sudo \
     rsync \
+    cifs-utils \
     dnf \
     python3 \
     python3-venv \
