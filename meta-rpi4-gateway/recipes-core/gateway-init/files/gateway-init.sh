@@ -1,8 +1,9 @@
 #!/bin/sh
 # Gateway first-boot initialization:
-#   1. If /data already has a valid ext4 fs, preserve it (just mount).
-#      Otherwise size rootfs (p2) to 2x its as-flashed size and devote
-#      everything past it to /data (p3).
+#   1. If /data already has a valid ext4 fs (in the partition table or
+#      lurking at the fixed offset from a previous boot), preserve it.
+#      Otherwise resize p2 to end at DATA_START_MB and create a fresh
+#      /data on p3.
 #   2. Mount config partition at /data
 #   3. Seed default user-editable configs if /data is empty (first-ever boot)
 #   4. Symlink user-editable configs from /data into /etc
@@ -11,19 +12,29 @@
 # so that recipe updates propagate to the device on reflash. Only
 # user-editable configs (network, dnsmasq drop-ins, hostname) are persisted.
 #
+# /data preservation across reflashes works only because DATA_START_MB is
+# constant: the wic image only writes the first ~1GB of the SD card, so
+# bytes from DATA_START_MB onward survive the dd. Each reflash declares
+# p3 at the same offset, blkid finds the existing ext4 superblock, and
+# the filesystem is preserved. Bumping DATA_START_MB across builds breaks
+# this — operators with existing devices would have to back up and
+# restore. The earlier dynamic-formula version of this script had exactly
+# that bug.
+#
 # Upgrade note: existing devices flashed before this layout (fixed 512MB
-# /data) keep their /data partition exactly as-is on reflash — the new
-# formula only fires on truly fresh SD cards with no /data filesystem.
-# To migrate an existing device to the larger /data layout: download a
-# backup via the admin UI, wipe the SD card partition table
-# (`wipefs -a /dev/sdX`), reflash, restore the backup.
+# /data, or the broken dynamic 2x-rootfs layout) get their /data wiped on
+# the next reflash because the old offset doesn't match DATA_START_MB.
+# Backup via the admin UI before reflashing in those cases. After one
+# reflash with this script in place, future reflashes preserve.
 
 set -e
 
-# Rootfs partition is sized to (as-flashed-rootfs-size * this factor) on
-# fresh SD cards. The remainder of the disk becomes /data. Bump the factor
-# to give the rootfs more growth room at the cost of /data space.
-ROOTFS_GROWTH_FACTOR=2
+# Fixed offset where /data starts. Constant across image builds — that's
+# the whole point. Big enough to leave the rootfs comfortable growth room
+# (current image is ~1GB so this is 4x headroom). Small enough to leave
+# the bulk of any reasonable SD card to /data: 28GB on a 32GB card,
+# 60GB on a 64GB card.
+DATA_START_MB=4096
 
 # Bail rather than carve out a tiny /data; usually means the SD card is
 # too small for this image's persistent-data needs.
@@ -52,39 +63,44 @@ DISK_SIZE_MB=$(($(blockdev --getsize64 "${DISK_DEV}") / 1024 / 1024))
 
 echo "gateway-init: disk=${DISK_DEV} size=${DISK_SIZE_MB}MB rootfs=p${ROOT_PARTNUM} config=p${CONFIG_PARTNUM}"
 
+if [ "$((DISK_SIZE_MB - DATA_START_MB))" -lt "${MIN_DATA_MB}" ]; then
+    echo "gateway-init: SD card too small (${DISK_SIZE_MB}MB) — at DATA_START_MB=${DATA_START_MB}MB only $((DISK_SIZE_MB - DATA_START_MB))MB would remain for /data (need >=${MIN_DATA_MB}MB)" >&2
+    exit 1
+fi
+
+# Case 1: p3 already in the partition table with a valid ext4 fs (e.g. a
+# soft reboot that re-runs this service for some reason). Just mount it.
 if blkid "${CONFIG_DEV}" 2>/dev/null | grep -q 'TYPE="ext4"'; then
-    # Existing /data on this card — leave the layout alone, just fsck and mount.
     echo "gateway-init: existing /data on ${CONFIG_DEV}, preserving layout"
     e2fsck -y "${CONFIG_DEV}" || true
 else
-    # Fresh card: double the rootfs partition, give the rest to /data.
-    ROOT_SIZE_MB=$(($(blockdev --getsize64 "${ROOTDEV}") / 1024 / 1024))
-    ROOT_START_SECTORS=$(cat "/sys/class/block/$(basename "${ROOTDEV}")/start")
-    ROOT_START_MB=$((ROOT_START_SECTORS / 2048))
-    NEW_ROOT_SIZE_MB=$((ROOT_SIZE_MB * ROOTFS_GROWTH_FACTOR))
-    NEW_ROOT_END_MB=$((ROOT_START_MB + NEW_ROOT_SIZE_MB))
-    DATA_SIZE_MB=$((DISK_SIZE_MB - NEW_ROOT_END_MB))
-
-    if [ "${DATA_SIZE_MB}" -lt "${MIN_DATA_MB}" ]; then
-        echo "gateway-init: SD card too small (${DISK_SIZE_MB}MB) — doubling rootfs to ${NEW_ROOT_SIZE_MB}MB would leave only ${DATA_SIZE_MB}MB for /data (need >=${MIN_DATA_MB}MB)" >&2
-        exit 1
-    fi
-
-    echo "gateway-init: rootfs ${ROOT_SIZE_MB}MB->${NEW_ROOT_SIZE_MB}MB, /data ${DATA_SIZE_MB}MB"
-
-    # Drop a stale p3 entry if one exists (no valid fs, so nothing to lose).
+    # Drop any stale p3 entry; if it had no valid fs there's nothing to lose.
     if parted -s "${DISK_DEV}" print | grep -q "^ ${CONFIG_PARTNUM} "; then
         parted -s "${DISK_DEV}" rm "${CONFIG_PARTNUM}"
     fi
 
-    parted -s "${DISK_DEV}" resizepart "${ROOT_PARTNUM}" "${NEW_ROOT_END_MB}MB"
+    # Grow rootfs to end at DATA_START_MB, then declare p3 from there to
+    # the end of the disk. resize2fs writes ext4 metadata throughout p2's
+    # new range — that's fine because anything below DATA_START_MB is
+    # rootfs territory.
+    parted -s "${DISK_DEV}" resizepart "${ROOT_PARTNUM}" "${DATA_START_MB}MB"
     resize2fs "${ROOTDEV}"
 
-    parted -s "${DISK_DEV}" mkpart primary ext4 "${NEW_ROOT_END_MB}MB" 100%
+    parted -s "${DISK_DEV}" mkpart primary ext4 "${DATA_START_MB}MB" 100%
     partprobe "${DISK_DEV}"
     sleep 1
 
-    mkfs.ext4 -L gateway-config -q "${CONFIG_DEV}"
+    # Case 2 vs 3: now that p3 is declared, blkid can see whether bytes
+    # at DATA_START_MB are an existing ext4 fs (reflash that preserved
+    # /data) or random (truly fresh card or migration from the old
+    # broken layout).
+    if blkid "${CONFIG_DEV}" 2>/dev/null | grep -q 'TYPE="ext4"'; then
+        echo "gateway-init: existing /data filesystem detected at p3, preserving"
+        e2fsck -y "${CONFIG_DEV}" || true
+    else
+        echo "gateway-init: fresh /data, formatting (rootfs ${DATA_START_MB}MB, /data $((DISK_SIZE_MB - DATA_START_MB))MB)"
+        mkfs.ext4 -L gateway-config -q "${CONFIG_DEV}"
+    fi
 fi
 
 mkdir -p "${DATA_MOUNT}"
