@@ -2,6 +2,28 @@ DESCRIPTION = "Home network gateway appliance for Raspberry Pi 4B (DHCP, DNS, we
 
 require recipes-core/images/core-image-base.bb
 
+# Operator SSH keys go through the standard FILESPATH lookup so the private
+# overlay layer (meta-rpi4-gateway-private) can drop its own authorized_keys
+# in via FILESEXTRAPATHS:prepend without touching this recipe. Image recipes
+# disable do_unpack, so SRC_URI won't work here; instead resolve the file
+# at parse time via bb.utils.which against FILESPATH.
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+
+python __resolve_authorized_keys() {
+    path = bb.utils.which(d.getVar('FILESPATH'), 'authorized_keys')
+    if not path:
+        bb.fatal(
+            "authorized_keys not found via FILESPATH. Either populate "
+            "meta-rpi4-gateway/recipes-images/images/files/authorized_keys "
+            "(see authorized_keys.example next to it) or enable the "
+            "meta-rpi4-gateway-private overlay (./scripts/build-image.sh "
+            "auto-detects it at ../meta-rpi4-gateway-private/kas/private.yml)."
+        )
+    d.setVar('OPERATOR_AUTHORIZED_KEYS', path)
+}
+addhandler __resolve_authorized_keys
+__resolve_authorized_keys[eventmask] = "bb.event.RecipePreFinalise"
+
 # Replace busybox with full GNU utilities
 VIRTUAL-RUNTIME_base-utils = "util-linux-base"
 VIRTUAL-RUNTIME_base-utils-hwclock = "util-linux-hwclock"
@@ -114,7 +136,7 @@ install_gateway_ssh_key() {
     # Host `chown` doesn't know target-side users/groups; use numeric IDs.
     install -d -m 755 ${IMAGE_ROOTFS}/home/gateway
     install -d -m 700 ${IMAGE_ROOTFS}/home/gateway/.ssh
-    install -m 600 ${THISDIR}/files/authorized_keys \
+    install -m 600 ${OPERATOR_AUTHORIZED_KEYS} \
         ${IMAGE_ROOTFS}/home/gateway/.ssh/authorized_keys
     chown -R ${GATEWAY_UID}:${GATEWAY_GID} ${IMAGE_ROOTFS}/home/gateway
 }
