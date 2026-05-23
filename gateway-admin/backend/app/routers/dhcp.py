@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
 
-from app.models.schemas import DhcpConfig, StaticLease
-from app.services import applier, config_store
+from app.models.schemas import ActiveLease, DhcpConfig, StaticLease
+from app.services import applier, config_store, dhcp_leases
 from app.services.generators import dhcp as dhcp_gen
 
 router = APIRouter(prefix="/api/dhcp", tags=["dhcp"])
@@ -36,7 +37,9 @@ def update_leases(leases: list[StaticLease]):
     return {"status": "ok", **_apply_current()}
 
 
-from pydantic import BaseModel
+@router.get("/leases/active", response_model=list[ActiveLease])
+def get_active_leases():
+    return dhcp_leases.get_active_leases()
 
 
 class DhcpPreviewBody(BaseModel):

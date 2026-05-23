@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { DhcpConfig, StaticLease } from "../api/client";
+import type { ActiveLease, DhcpConfig, StaticLease } from "../api/client";
 import Card from "../components/Card";
 import FormField, { inputStyle } from "../components/FormField";
 import Preview from "../components/Preview";
@@ -46,9 +46,24 @@ const tdStyle: React.CSSProperties = {
 
 const emptyLease: StaticLease = { mac: "", ip: "", hostname: "", comment: "", enabled: true };
 
+function formatExpires(expiresAt: number): string {
+  if (expiresAt === 0) return "never";
+  const ms = expiresAt * 1000 - Date.now();
+  if (ms <= 0) return "expired";
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 export default function DHCP() {
   const [config, setConfig] = useState<DhcpConfig | null>(null);
   const [leases, setLeases] = useState<StaticLease[]>([]);
+  const [active, setActive] = useState<ActiveLease[]>([]);
+  const [activeError, setActiveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [newLease, setNewLease] = useState<StaticLease>({ ...emptyLease });
   const [preview, setPreview] = useState<{ dhcp: string; static_leases: string }>({ dhcp: "", static_leases: "" });
@@ -56,9 +71,20 @@ export default function DHCP() {
   const formState = useMemo(() => ({ config, leases }), [config, leases]);
   const debounced = useDebounced(formState);
 
+  const refreshActive = () => {
+    api.getActiveLeases()
+      .then((rows) => { setActive(rows); setActiveError(null); })
+      .catch((e) => setActiveError(e.message ?? String(e)));
+  };
+
   useEffect(() => {
     api.getDhcp().then(setConfig);
     api.getLeases().then(setLeases);
+    refreshActive();
+    // Re-poll active leases every 60s so the "expires in" column doesn't
+    // go stale while the operator is staring at the page.
+    const handle = setInterval(refreshActive, 60_000);
+    return () => clearInterval(handle);
   }, []);
 
   useEffect(() => {
@@ -184,6 +210,48 @@ export default function DHCP() {
             <input style={inputStyle} value={config.boot_filename} onChange={(e) => updateConfig("boot_filename", e.target.value)} placeholder="pxelinux.0" />
           </FormField>
         </div>
+      </Card>
+
+      <Card title="Active Leases">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <span style={{ fontSize: 13, color: "#636e72" }}>
+            Dynamic leases currently held by clients (read from dnsmasq)
+          </span>
+          <button
+            style={{ ...btnStyle, padding: "4px 12px", fontSize: 13, background: "#636e72" }}
+            onClick={refreshActive}
+          >
+            Refresh
+          </button>
+        </div>
+        {activeError ? (
+          <p style={{ color: "#d63031", fontSize: 13 }}>Failed to load: {activeError}</p>
+        ) : active.length === 0 ? (
+          <p style={{ color: "#636e72", fontSize: 13 }}>No active leases.</p>
+        ) : (
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>IP Address</th>
+                <th style={thStyle}>MAC Address</th>
+                <th style={thStyle}>Hostname</th>
+                <th style={thStyle}>Client ID</th>
+                <th style={thStyle}>Expires In</th>
+              </tr>
+            </thead>
+            <tbody>
+              {active.map((lease, idx) => (
+                <tr key={`${lease.mac}-${lease.ip}-${idx}`}>
+                  <td style={tdStyle}>{lease.ip}</td>
+                  <td style={tdStyle} title={lease.mac}>{lease.mac}</td>
+                  <td style={tdStyle}>{lease.hostname || <span style={{ color: "#b2bec3" }}>—</span>}</td>
+                  <td style={tdStyle}>{lease.client_id || <span style={{ color: "#b2bec3" }}>—</span>}</td>
+                  <td style={tdStyle}>{formatExpires(lease.expires_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       <Card title="Static Leases">
