@@ -16,11 +16,13 @@ from app.models.schemas import (
     DhcpConfig,
     DnsConfig,
     HostEntry,
+    NasConfig,
     NetworkConfig,
     StaticLease,
 )
 from app.services.generators import dhcp as dhcp_gen
 from app.services.generators import dns as dns_gen
+from app.services.generators import nas as nas_gen
 from app.services.generators import network as network_gen
 
 
@@ -123,6 +125,134 @@ def apply_dhcp(config: DhcpConfig, leases: list[StaticLease]) -> dict:
         result["applied"] = True
         result["paths"] = [str(dhcp_path), str(leases_path)]
 
+    return result
+
+
+def _nas_unit_dir() -> Path:
+    return _data_dir() / "systemd" / "nas"
+
+
+def _nas_credentials_dir() -> Path:
+    return _data_dir() / "nas" / "credentials"
+
+
+def _systemd_etc() -> Path:
+    return Path("/etc/systemd/system")
+
+
+def _existing_managed_basenames() -> set[str]:
+    """Return basenames of NAS-managed unit files currently on disk."""
+    d = _nas_unit_dir()
+    if not d.exists():
+        return set()
+    return {p.name for p in d.iterdir() if p.is_file()}
+
+
+def _teardown_unit(unit_name: str):
+    """Stop+disable a unit and remove its symlink + source file."""
+    _systemctl("stop", unit_name)
+    _systemctl("disable", unit_name)
+    link = _systemd_etc() / unit_name
+    if link.is_symlink() or link.exists():
+        link.unlink()
+    src = _nas_unit_dir() / unit_name
+    if src.exists():
+        src.unlink()
+
+
+def apply_nas(config: NasConfig) -> dict:
+    """Materialize systemd .mount/.automount units for NAS mounts.
+
+    Source files live under /data/systemd/nas/, symlinked into
+    /etc/systemd/system/. Credentials go to /data/nas/credentials/<id>
+    (mode 0600). Units removed from the config are torn down. Each
+    enabled mount has its .automount started; each disabled mount is
+    stopped+disabled but its files are left on disk so flipping enabled
+    back on does not need a re-save of credentials.
+    """
+    desired_units: dict[str, str] = {}  # basename -> content
+    desired_creds: dict[str, str] = {}  # path -> content
+    desired_mountpoints: list[str] = []
+    enabled_automounts: list[str] = []
+    disabled_units: list[str] = []
+
+    for mount in config.mounts:
+        base = nas_gen.unit_basename(mount)
+        mount_unit = f"{base}.mount"
+        automount_unit = f"{base}.automount"
+        desired_mountpoints.append(mount.mount_path)
+
+        creds_content = nas_gen.credentials_content(mount)
+        if creds_content is not None:
+            creds_path = _nas_credentials_dir() / mount.id
+            desired_creds[str(creds_path)] = creds_content
+            creds_path_str = str(creds_path)
+        else:
+            creds_path_str = None
+
+        desired_units[mount_unit] = nas_gen.generate_mount_unit(mount, creds_path_str)
+        desired_units[automount_unit] = nas_gen.generate_automount_unit(mount)
+
+        if mount.enabled:
+            enabled_automounts.append(automount_unit)
+        else:
+            disabled_units.extend([automount_unit, mount_unit])
+
+    result = {
+        "generated": {name: content for name, content in desired_units.items()},
+        "applied": False,
+    }
+
+    if not _is_production():
+        return result
+
+    # Tear down units no longer in the config.
+    existing = _existing_managed_basenames()
+    for stale in existing - desired_units.keys():
+        _teardown_unit(stale)
+
+    # Write source files, credentials, and symlink into /etc/systemd/system/.
+    _nas_unit_dir().mkdir(parents=True, exist_ok=True)
+    creds_dir = _nas_credentials_dir()
+    creds_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        creds_dir.chmod(0o700)
+    except OSError:
+        pass
+
+    # Remove credentials whose mount was removed.
+    if creds_dir.exists():
+        kept_ids = {m.id for m in config.mounts if nas_gen.credentials_content(m) is not None}
+        for f in creds_dir.iterdir():
+            if f.is_file() and f.name not in kept_ids:
+                f.unlink()
+
+    for path_str, content in desired_creds.items():
+        p = Path(path_str)
+        p.write_text(content)
+        p.chmod(0o600)
+
+    for unit_name, content in desired_units.items():
+        src = _nas_unit_dir() / unit_name
+        _write(src, content)
+        _ensure_symlink(src, _systemd_etc() / unit_name)
+
+    # Ensure mount points exist (mountpoints, owned by root, 0755).
+    for mp in desired_mountpoints:
+        Path(mp).mkdir(parents=True, exist_ok=True)
+
+    _systemctl("daemon-reload")
+
+    for unit in disabled_units:
+        _systemctl("stop", unit)
+        _systemctl("disable", unit)
+
+    for unit in enabled_automounts:
+        _systemctl("enable", unit)
+        _systemctl("start", unit)
+
+    result["applied"] = True
+    result["unit_dir"] = str(_nas_unit_dir())
     return result
 
 

@@ -8,6 +8,7 @@ import DHCP from "./pages/DHCP";
 import DNS from "./pages/DNS";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import NAS from "./pages/NAS";
 import Network from "./pages/Network";
 import Services from "./pages/Services";
 
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/dns" element={<DNS />} />
           <Route path="/services" element={<Services />} />
           <Route path="/apps" element={<Apps />} />
+          <Route path="/nas" element={<NAS />} />
           <Route path="/backup" element={<Backup />} />
         </Route>
       </Routes>

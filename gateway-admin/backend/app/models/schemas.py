@@ -1,4 +1,6 @@
-from pydantic import BaseModel, model_validator
+import re
+
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class NetworkConfig(BaseModel):
@@ -9,7 +11,11 @@ class NetworkConfig(BaseModel):
     address: str = "192.168.0.2"
     netmask: str = "255.255.255.0"
     gateway: str = "192.168.0.1"
-    dns: list[str] = ["8.8.8.8"]
+    dns: list[str] = ["127.0.0.1"]
+    # Search domain for systemd-resolved on stilgar itself; bare names get
+    # this appended (e.g. `media-02` → `media-02.<domain>`). Independent of
+    # DhcpConfig.domain (which dnsmasq sends to LAN clients via DHCP option 15).
+    domain: str = ""
     hostname: str = ""
 
 
@@ -49,6 +55,16 @@ class StaticLease(BaseModel):
     enabled: bool = True
 
 
+class ActiveLease(BaseModel):
+    # Unix epoch when the lease expires. 0 means a never-expiring (static)
+    # lease, per dnsmasq's leasefile format.
+    expires_at: int
+    mac: str
+    ip: str
+    hostname: str
+    client_id: str
+
+
 class DnsConfig(BaseModel):
     upstream_servers: list[str] = []
     domain: str = ""
@@ -65,6 +81,69 @@ class ServiceStatus(BaseModel):
     active: bool
     enabled: bool
     status: str
+
+
+_NAS_SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+_DEFAULT_NAS_OPTIONS = "vers=3.0,iocharset=utf8,nofail,_netdev,noperm"
+
+
+class NasMount(BaseModel):
+    # Slug becomes the mount path (/mnt/<id>) and the systemd unit basename.
+    id: str
+    server: str
+    share: str
+    username: str = ""
+    password: str = ""
+    # Extra options appended after the defaults; leave empty for the
+    # noperm/nofail/_netdev defaults that suit a home NAS.
+    extra_options: str = ""
+    enabled: bool = True
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, v: str) -> str:
+        if not _NAS_SLUG_RE.match(v):
+            raise ValueError(
+                "id must match [a-z0-9-]+, start and end with alphanumeric"
+            )
+        return v
+
+    @field_validator("server", "share")
+    @classmethod
+    def _strip_required(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be empty")
+        return v
+
+    @property
+    def mount_path(self) -> str:
+        return f"/mnt/{self.id}"
+
+
+class NasConfig(BaseModel):
+    mounts: list[NasMount] = []
+
+    @model_validator(mode="after")
+    def _unique_ids(self):
+        ids = [m.id for m in self.mounts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("mount ids must be unique")
+        return self
+
+
+class NasMountStatus(BaseModel):
+    id: str
+    mount_path: str
+    enabled: bool
+    mounted: bool
+    automount_active: bool
+    last_error: str = ""
+
+
+class NasTestResult(BaseModel):
+    ok: bool
+    message: str
 
 
 class SystemInfo(BaseModel):

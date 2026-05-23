@@ -53,7 +53,7 @@ export default function Network() {
 
   if (!config) return <p>Loading...</p>;
 
-  const update = (field: keyof NetworkConfig, value: string | string[]) => {
+  const update = <K extends keyof NetworkConfig>(field: K, value: NetworkConfig[K]) => {
     setConfig({ ...config, [field]: value });
     setStatus({ kind: "idle" });
   };
@@ -61,7 +61,12 @@ export default function Network() {
   const save = async () => {
     const currentHost = window.location.hostname;
     const newHost = config.mode === "static" && config.address ? config.address : null;
-    const willChangeIp = newHost && newHost !== currentHost;
+    // Only redirect when the current URL is the literal IP that's being
+    // changed. Accessing the UI by hostname (e.g. `stilgar`) means a config
+    // change to the IP doesn't break the browser's connection — DNS keeps
+    // resolving — so we'd wrongly trigger the wait flow on every save.
+    const isIpUrl = /^\d+\.\d+\.\d+\.\d+$/.test(currentHost);
+    const willChangeIp = isIpUrl && newHost && newHost !== currentHost;
 
     // Fire the update; we may not see the response if the IP changes mid-request.
     api.updateNetwork(config).catch(() => { /* expected on IP change */ });
@@ -86,6 +91,17 @@ export default function Network() {
       <Card title="Interface Settings">
         <FormField label="Hostname">
           <input style={inputStyle} value={config.hostname} onChange={(e) => update("hostname", e.target.value)} />
+        </FormField>
+        <FormField label="Search Domain">
+          <input
+            style={inputStyle}
+            placeholder="punak.com"
+            value={config.domain}
+            onChange={(e) => update("domain", e.target.value)}
+          />
+          <small style={{ color: "#636e72" }}>
+            Bare hostnames (e.g. <code>media-02</code>) get this appended for stilgar's own resolver. Leave blank to require FQDNs.
+          </small>
         </FormField>
         <FormField label="Mode">
           <select style={inputStyle} value={config.mode} onChange={(e) => update("mode", e.target.value)}>

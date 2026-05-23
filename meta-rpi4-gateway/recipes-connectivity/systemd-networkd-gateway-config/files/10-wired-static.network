@@ -7,7 +7,7 @@ Type=ether
 # the admin UI; saved values land in /data/network/ and override
 # this file via the symlink gateway-init drops on first boot.
 Address=192.168.0.2/24
-DNS=8.8.8.8
+DNS=127.0.0.1
 MulticastDNS=yes
 
 [Route]

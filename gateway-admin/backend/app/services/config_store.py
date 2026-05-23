@@ -14,6 +14,7 @@ from app.models.schemas import (
     DhcpConfig,
     DnsConfig,
     HostEntry,
+    NasConfig,
     NetworkConfig,
     StaticLease,
 )
@@ -49,7 +50,8 @@ def _seed_defaults():
         address="192.168.0.2",
         netmask="255.255.255.0",
         gateway="192.168.0.1",
-        dns=["8.8.8.8"],
+        dns=["127.0.0.1"],
+        domain="punak.com",
         hostname="gateway",
     ).model_dump())
 
@@ -157,3 +159,14 @@ def save_host_entries(entries: list[HostEntry]):
         _get_data_dir() / "hosts.json",
         [e.model_dump() for e in entries],
     )
+
+
+# --- NAS ---
+
+def get_nas_config() -> NasConfig:
+    data = _read_json(_get_data_dir() / "nas.json")
+    return NasConfig(**data) if data else NasConfig()
+
+
+def save_nas_config(config: NasConfig):
+    _write_json(_get_data_dir() / "nas.json", config.model_dump())

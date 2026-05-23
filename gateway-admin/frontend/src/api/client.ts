@@ -16,7 +16,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     let detail = `${res.status} ${res.statusText}`;
     try {
       const body = await res.json();
-      if (body.detail) detail = body.detail;
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        // FastAPI/Pydantic 422 returns [{loc, msg, type}, ...]
+        detail = body.detail
+          .map((e: { loc?: (string | number)[]; msg?: string }) => {
+            const field = e.loc?.filter((p) => p !== "body").join(".") || "body";
+            return `${field}: ${e.msg ?? "invalid"}`;
+          })
+          .join("; ");
+      }
     } catch { /* ignore */ }
     throw new Error(detail);
   }
@@ -29,6 +39,7 @@ export interface NetworkConfig {
   netmask: string;
   gateway: string;
   dns: string[];
+  domain: string;
   hostname: string;
 }
 
@@ -55,6 +66,15 @@ export interface StaticLease {
   hostname: string;
   comment: string;
   enabled: boolean;
+}
+
+export interface ActiveLease {
+  // Unix epoch when the lease expires; 0 means never-expiring (static).
+  expires_at: number;
+  mac: string;
+  ip: string;
+  hostname: string;
+  client_id: string;
 }
 
 export interface DnsConfig {
@@ -84,6 +104,34 @@ export interface SystemInfo {
   memory_used: string;
   disk_total: string;
   disk_used: string;
+}
+
+export interface NasMount {
+  id: string;
+  server: string;
+  share: string;
+  username: string;
+  password: string;
+  extra_options: string;
+  enabled: boolean;
+}
+
+export interface NasConfig {
+  mounts: NasMount[];
+}
+
+export interface NasMountStatus {
+  id: string;
+  mount_path: string;
+  enabled: boolean;
+  mounted: boolean;
+  automount_active: boolean;
+  last_error: string;
+}
+
+export interface NasTestResult {
+  ok: boolean;
+  message: string;
 }
 
 export interface AuthStatus {
@@ -117,7 +165,9 @@ export interface AppWebUiSpec {
   port: number;
   path: string | null;
   strip_prefix: boolean;
-  requires_admin: boolean;
+  // "none" (default) — no gateway gate; app handles its own auth.
+  // "admin"            — nginx auth_request gates on gateway-admin session.
+  gateway_auth: "none" | "admin";
 }
 
 export interface AppConfigField {
@@ -205,6 +255,7 @@ export const api = {
   getLeases: () => request<StaticLease[]>("/dhcp/leases"),
   updateLeases: (l: StaticLease[]) =>
     request("/dhcp/leases", { method: "PUT", body: JSON.stringify(l) }),
+  getActiveLeases: () => request<ActiveLease[]>("/dhcp/leases/active"),
   getDns: () => request<DnsConfig>("/dns"),
   updateDns: (c: DnsConfig) =>
     request("/dns", { method: "PUT", body: JSON.stringify(c) }),
@@ -229,7 +280,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ config, hosts }),
     }),
-  downloadBackup: async (includeSecrets: boolean, passphrase: string) => {
+  downloadBackup: async (
+    includeSecrets: boolean,
+    passphrase: string,
+    onProgress?: (received: number) => void,
+  ) => {
     const form = new FormData();
     form.append("include_secrets", String(includeSecrets));
     if (passphrase) form.append("passphrase", passphrase);
@@ -243,8 +298,33 @@ export const api = {
       try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
       throw new Error(detail);
     }
-    return res.blob();
+    // The backend streams unencrypted backups; we read in chunks and
+    // count bytes for a fallback display. The richer progress (file
+    // count + percent) comes from polling /api/backup/progress, which
+    // the caller drives separately.
+    if (!res.body || !onProgress) {
+      return res.blob();
+    }
+    const reader = res.body.getReader();
+    // BlobPart accepts BufferSource; the reader yields generic
+    // Uint8Array<ArrayBufferLike> which TS narrows away from BlobPart,
+    // so collect as the looser type and cast at construction.
+    const chunks: BlobPart[] = [];
+    let received = 0;
+    onProgress(0);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value as BlobPart);
+      received += value.length;
+      onProgress(received);
+    }
+    return new Blob(chunks);
   },
+  getBackupProgress: () =>
+    request<{ phase: "idle" | "streaming" | "done"; files_done: number; files_total: number }>(
+      "/backup/progress",
+    ),
   restoreBackup: async (file: File, passphrase: string) => {
     const form = new FormData();
     form.append("file", file);
@@ -305,4 +385,18 @@ export const api = {
     request<{ status: string }>(`/apps/${id}/${action}`, { method: "POST" }),
   getAppStatus: (id: string) =>
     request<Record<string, string>>(`/apps/${id}/status`),
+  getNas: () => request<NasConfig>("/nas"),
+  updateNas: (c: NasConfig) =>
+    request("/nas", { method: "PUT", body: JSON.stringify(c) }),
+  getNasStatus: () => request<NasMountStatus[]>("/nas/status"),
+  previewNas: (c: NasConfig) =>
+    request<Record<string, string>>("/nas/preview", {
+      method: "POST",
+      body: JSON.stringify(c),
+    }),
+  testNas: (m: NasMount) =>
+    request<NasTestResult>("/nas/test", {
+      method: "POST",
+      body: JSON.stringify(m),
+    }),
 };

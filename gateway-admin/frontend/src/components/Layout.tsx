@@ -8,6 +8,7 @@ const navItems = [
   { to: "/dns", label: "DNS" },
   { to: "/services", label: "Services" },
   { to: "/apps", label: "Apps" },
+  { to: "/nas", label: "NAS" },
   { to: "/backup", label: "Backup" },
 ];
 
@@ -15,10 +16,14 @@ const navStyle: React.CSSProperties = {
   width: 220,
   background: "#2d3436",
   color: "#dfe6e9",
-  minHeight: "100vh",
+  height: "100vh",
   padding: "24px 0",
   display: "flex",
   flexDirection: "column",
+  position: "sticky",
+  top: 0,
+  alignSelf: "flex-start",
+  overflowY: "auto",
 };
 
 const linkStyle: React.CSSProperties = {
