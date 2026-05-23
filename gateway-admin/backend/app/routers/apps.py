@@ -11,6 +11,9 @@ Endpoints (all require admin auth via the protected dependency in main.py):
     PUT    /api/apps/{id}/config      update config values + restart services
     POST   /api/apps/{id}/{action}    start | stop | restart all services
     GET    /api/apps/{id}/status      per-service is-active state
+
+The unauthenticated manifest JSON Schema lives in `routers/docs.py` so
+build pipelines can fetch it without a session cookie.
 """
 
 import json
