@@ -16,7 +16,10 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/02-dhcp.conf ${D}${sysconfdir}/dnsmasq.d/
 }
 
-# Don't auto-enable during development — conflicts with feyd's DHCP server
+# Don't auto-enable at boot: dnsmasq is reconciled into the configured
+# state by gateway-admin once /data is mounted and the persisted config
+# is loaded. Premature startup with the recipe-shipped defaults would
+# conflict with an upstream DHCP server on the same LAN.
 SYSTEMD_AUTO_ENABLE = "disable"
 
 FILES:${PN} += "${sysconfdir}/dnsmasq.d/"

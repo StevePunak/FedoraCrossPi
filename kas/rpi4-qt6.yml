@@ -71,6 +71,6 @@ local_conf_header:
     BB_NUMBER_THREADS = "48"
     PARALLEL_MAKE = "-j 48"
 
-    # Package feed — hosted on feyd, synced via scripts/sync-packages.sh
-    PACKAGE_FEED_URIS = "http://feyd:880"
+    # Optional package feed for on-device dnf. Set in a local overlay
+    # (e.g. kas/local.yml) when running a private feed.
     PACKAGE_FEED_BASE_PATHS = "rpm"

@@ -11,7 +11,7 @@ def _stub_system_info() -> SystemInfo:
     return SystemInfo(
         hostname="gateway",
         uptime="0 days, 1:23:45",
-        ip_address="192.168.0.78",
+        ip_address="192.168.0.2",
         kernel="6.12.0-yocto-standard",
         memory_total="1.8 GB",
         memory_used="256 MB",

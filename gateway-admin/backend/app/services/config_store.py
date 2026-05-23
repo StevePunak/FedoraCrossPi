@@ -41,7 +41,10 @@ def _get_data_dir() -> Path:
 
 
 def _seed_defaults():
-    """Seed the dev config directory with sample data."""
+    """Seed the dev config directory with neutral sample data so the UI
+    has something to render in dev mode without baking any operator's
+    LAN topology into the source tree. Real config is created the first
+    time an operator saves anything in the admin UI."""
     d = _data_dir
     d.mkdir(parents=True, exist_ok=True)
 
@@ -51,7 +54,7 @@ def _seed_defaults():
         netmask="255.255.255.0",
         gateway="192.168.0.1",
         dns=["127.0.0.1"],
-        domain="punak.com",
+        domain="",
         hostname="gateway",
     ).model_dump())
 
@@ -63,35 +66,24 @@ def _seed_defaults():
         netmask="255.255.255.0",
         lease_time="24h",
         router="192.168.0.1",
-        dns_servers=["192.168.0.51", "8.8.8.8"],
-        domain="punak.com",
-        domain_search=["punak.com"],
-        ntp_servers=["192.168.0.51"],
+        dns_servers=["8.8.8.8", "1.1.1.1"],
+        domain="",
+        domain_search=[],
+        ntp_servers=["pool.ntp.org"],
         mtu=1500,
         tftp_server="",
         boot_filename="",
     ).model_dump())
 
-    _write_json(d / "static_leases.json", [
-        StaticLease(mac="DC:A6:32:3C:32:E3", ip="192.168.0.78", hostname="kiosk",
-                    comment="Gateway dev Pi", enabled=True).model_dump(),
-        StaticLease(mac="00:11:32:D9:79:F9", ip="192.168.0.12", hostname="media-02",
-                    comment="NAS", enabled=True).model_dump(),
-        StaticLease(mac="C8:21:58:8A:A0:E8", ip="192.168.0.30", hostname="globula",
-                    comment="", enabled=True).model_dump(),
-    ])
+    _write_json(d / "static_leases.json", [])
 
     _write_json(d / "dns.json", DnsConfig(
-        upstream_servers=["8.8.8.8", "8.8.4.4"],
-        domain="punak.com",
+        upstream_servers=["8.8.8.8", "1.1.1.1"],
+        domain="",
         expand_hosts=True,
     ).model_dump())
 
-    _write_json(d / "hosts.json", [
-        HostEntry(ip="192.168.0.11", hostnames=["media.punak.com"]).model_dump(),
-        HostEntry(ip="192.168.0.12", hostnames=["media-02.punak.com"]).model_dump(),
-        HostEntry(ip="192.168.0.51", hostnames=["feyd.punak.com"]).model_dump(),
-    ])
+    _write_json(d / "hosts.json", [])
 
 
 def _read_json(path: Path) -> dict | list:

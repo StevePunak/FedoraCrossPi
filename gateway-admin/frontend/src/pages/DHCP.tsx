@@ -204,7 +204,7 @@ export default function DHCP() {
       <Card title="PXE / Network Boot (optional)">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <FormField label="TFTP Server">
-            <input style={inputStyle} value={config.tftp_server} onChange={(e) => updateConfig("tftp_server", e.target.value)} placeholder="192.168.0.51" />
+            <input style={inputStyle} value={config.tftp_server} onChange={(e) => updateConfig("tftp_server", e.target.value)} placeholder="192.168.0.1" />
           </FormField>
           <FormField label="Boot Filename">
             <input style={inputStyle} value={config.boot_filename} onChange={(e) => updateConfig("boot_filename", e.target.value)} placeholder="pxelinux.0" />

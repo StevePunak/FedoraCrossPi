@@ -9,8 +9,8 @@ def generate_dns(config: DnsConfig) -> str:
         lines.append(f"domain={config.domain}")
         # Don't add `local=/{domain}/`: that would make dnsmasq authoritative
         # for the entire zone and refuse to forward queries for names not in
-        # our local host entries — including the public apex (e.g.
-        # punak.com itself), breaking access to the real website.
+        # our local host entries — including the public apex of the same
+        # domain, breaking access to the real website.
     if config.expand_hosts:
         lines.append("expand-hosts")
     if not lines:

@@ -28,6 +28,9 @@ __pycache__/
 meta-rpi4-private/
 meta-rpi4-gateway-private/
 
+# Operator SSH keys baked into the gateway image (see *.example)
+meta-rpi4-gateway/recipes-images/images/files/authorized_keys
+
 # Backend wheels staged by scripts/build-image.sh before kas build
 gateway-admin/backend/wheels/
 

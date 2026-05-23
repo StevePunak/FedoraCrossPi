@@ -95,7 +95,7 @@ export default function Network() {
         <FormField label="Search Domain">
           <input
             style={inputStyle}
-            placeholder="punak.com"
+            placeholder="home.local"
             value={config.domain}
             onChange={(e) => update("domain", e.target.value)}
           />

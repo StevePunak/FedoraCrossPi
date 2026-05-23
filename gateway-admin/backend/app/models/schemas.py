@@ -12,8 +12,8 @@ class NetworkConfig(BaseModel):
     netmask: str = "255.255.255.0"
     gateway: str = "192.168.0.1"
     dns: list[str] = ["127.0.0.1"]
-    # Search domain for systemd-resolved on stilgar itself; bare names get
-    # this appended (e.g. `media-02` → `media-02.<domain>`). Independent of
+    # Search domain for systemd-resolved on the appliance itself; bare names
+    # get this appended (e.g. `nas` → `nas.<domain>`). Independent of
     # DhcpConfig.domain (which dnsmasq sends to LAN clients via DHCP option 15).
     domain: str = ""
     hostname: str = ""

@@ -1,0 +1,11 @@
+# Operator SSH public keys baked into the gateway image's gateway user.
+#
+# Copy this file to `authorized_keys` (in the same directory) and add
+# your own public keys, one per line. The file is gitignored to keep
+# operator identity out of the public repo. The image recipe installs
+# `files/authorized_keys` verbatim; if the file is missing the build
+# fails with a clear "No such file or directory" error, which is the
+# intended signal to populate it.
+#
+# Example contents:
+# ssh-ed25519 AAAA...your-key... operator@workstation
