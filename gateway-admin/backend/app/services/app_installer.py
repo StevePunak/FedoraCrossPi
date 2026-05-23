@@ -35,7 +35,7 @@ from pathlib import Path
 from app.models.app_install import InstalledApp
 from app.models.app_manifest import AppManifest
 from app.services import app_store
-from app.services.generators import app_env, app_nginx, app_systemd
+from app.services.generators import app_env, app_mount, app_nginx, app_systemd
 from app.services.hooks import HookError, run_hook
 
 APPS_DIR = Path("/data/apps")
@@ -66,6 +66,7 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
 
     manifest = _read_manifest(archive_bytes)
     _check_compatibility(manifest)
+    _check_mount_conflicts(manifest)
 
     merged_config = _validate_config(manifest, config_values)
 
@@ -128,10 +129,17 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
 
         _run_hook(manifest, install_dir, "pre_install", merged_config)
         _write_config_env(record)
+        _write_mount_artifacts(record)
         _write_systemd_units(record)
         _write_nginx_drop_in(record)
 
         _systemctl("daemon-reload")
+
+        # Mountpoints first so post_install hooks (and the services that
+        # follow) see a populated /data/nas/... etc. Lazy automounts won't
+        # actually mount until first access — that's fine, the .automount
+        # is what the service Requires=.
+        _activate_mount_units(record)
 
         # post_install runs before services start so hooks can prep runtime
         # artifacts the units depend on (e.g. building a Python venv from
@@ -171,6 +179,7 @@ def _rollback(manifest: AppManifest, install_dir: Path) -> None:
         unit = app_systemd.unit_name(manifest.id, svc.name)
         _systemctl("disable", "--now", unit, check=False)
         (SYSTEMD_DIR / unit).unlink(missing_ok=True)
+    _remove_mount_artifacts(manifest)
     _systemctl("daemon-reload", check=False)
 
     nginx_path = Path(app_nginx.conf_path(manifest.id))
@@ -203,6 +212,7 @@ def uninstall(app_id: str) -> None:
     for svc in record.manifest.services:
         path = SYSTEMD_DIR / app_systemd.unit_name(app_id, svc.name)
         path.unlink(missing_ok=True)
+    _remove_mount_artifacts(record.manifest)
     _systemctl("daemon-reload", check=False)
 
     nginx_path = Path(app_nginx.conf_path(app_id))
@@ -226,6 +236,9 @@ def update_config(app_id: str, config_values: dict) -> InstalledApp:
     merged = _validate_config(record.manifest, config_values)
     record.config_values = merged
     _write_config_env(record)
+    # Credentials referenced by mount specs are pulled from config_values,
+    # so re-render them too. The mount unit itself doesn't change shape.
+    _write_mount_credentials(record)
 
     for svc in record.manifest.services:
         unit = app_systemd.unit_name(app_id, svc.name)
@@ -297,6 +310,7 @@ def reconcile() -> list[str]:
         _run("chown", "-R", f"{user}:{user}", str(install_dir), check=False)
 
         _write_config_env(record)
+        _write_mount_artifacts(record)
         _write_systemd_units(record)
         _write_nginx_drop_in(record)
         needs_daemon_reload = True
@@ -309,15 +323,17 @@ def reconcile() -> list[str]:
     if any_web_ui:
         _run("nginx", "-s", "reload", check=False)
 
-    # Now that units are loaded, enable+start each service for enabled
-    # apps. Done in a second pass after daemon-reload so systemd sees
-    # the freshly-written unit files.
+    # Now that units are loaded, enable+start mounts first (so service
+    # `Requires=` is satisfied), then service units. Done in a second
+    # pass after daemon-reload so systemd sees the freshly-written
+    # unit files.
     for record in app_store.get_all():
         if not record.enabled:
             continue
         install_dir = APPS_DIR / record.id
         if not install_dir.exists():
             continue
+        _activate_mount_units(record)
         for svc in record.manifest.services:
             unit = app_systemd.unit_name(record.id, svc.name)
             _systemctl("enable", "--now", unit, check=False)
@@ -500,6 +516,94 @@ def _write_systemd_units(record: InstalledApp) -> None:
         path = SYSTEMD_DIR / app_systemd.unit_name(record.id, svc.name)
         path.write_text(text)
         path.chmod(0o644)
+
+
+def _check_mount_conflicts(manifest: AppManifest) -> None:
+    """Reject install if any other installed app already claims one of our
+    Where= paths. Per-app mount tables only — a single Where can have at
+    most one owner. The own-app upgrade case (manifest.id matches an
+    already-installed record) is allowed."""
+    if not manifest.mounts:
+        return
+    wheres = {m.where.rstrip("/"): m.name for m in manifest.mounts}
+    conflicts: dict[str, list[str]] = {}
+    for record in app_store.get_all():
+        if record.id == manifest.id:
+            continue
+        for other in record.manifest.mounts:
+            key = other.where.rstrip("/")
+            if key in wheres:
+                conflicts.setdefault(key, []).append(record.id)
+    if conflicts:
+        lines = [
+            f"  {where}: also claimed by {', '.join(sorted(set(ids)))}"
+            for where, ids in sorted(conflicts.items())
+        ]
+        raise InstallError(
+            "mount conflict — another app already owns these mount points:\n"
+            + "\n".join(lines)
+        )
+
+
+def _write_mount_artifacts(record: InstalledApp) -> None:
+    """Render .mount / .automount unit files and any credentials files."""
+    _write_mount_credentials(record)
+    for spec in record.manifest.mounts:
+        mount_text = app_mount.generate_mount(record, spec)
+        mount_path = SYSTEMD_DIR / app_mount.mount_unit_name(spec.where)
+        mount_path.write_text(mount_text)
+        mount_path.chmod(0o644)
+        if spec.automount:
+            auto_text = app_mount.generate_automount(record, spec)
+            auto_path = SYSTEMD_DIR / app_mount.automount_unit_name(spec.where)
+            auto_path.write_text(auto_text)
+            auto_path.chmod(0o644)
+
+
+def _write_mount_credentials(record: InstalledApp) -> None:
+    """Write credentials= files for every mount that declares them.
+    Created under /data/apps/<id>/state/, mode 0600, owned by app-<id> so
+    only the running daemon (and root) can read them."""
+    if not any(m.credentials is not None for m in record.manifest.mounts):
+        return
+    state_dir = APPS_DIR / record.id / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    user = f"app-{record.id}"
+    _run("chown", f"{user}:{user}", str(state_dir), check=False)
+    state_dir.chmod(0o700)
+    for spec in record.manifest.mounts:
+        text = app_mount.generate_credentials_file(spec, record.config_values)
+        if text is None:
+            continue
+        path = app_mount.cred_path(record.id, spec.name)
+        path.write_text(text)
+        path.chmod(0o600)
+        _run("chown", f"{user}:{user}", str(path), check=False)
+
+
+def _activate_mount_units(record: InstalledApp) -> None:
+    """Enable + start the unit a service Requires= (the .automount when
+    lazy, the .mount when eager). The peer (.mount in the lazy case) is
+    pulled in automatically when the .automount fires."""
+    for spec in record.manifest.mounts:
+        unit = app_mount.required_unit_name(spec)
+        _systemctl("enable", "--now", unit, check=False)
+
+
+def _remove_mount_artifacts(manifest: AppManifest) -> None:
+    """Stop + disable + delete the .mount / .automount unit files for
+    every spec. The state/<name>.creds files live under install_dir and
+    go away with the rmtree in uninstall()/rollback."""
+    for spec in manifest.mounts:
+        mount_unit = app_mount.mount_unit_name(spec.where)
+        auto_unit = app_mount.automount_unit_name(spec.where)
+        # Order matters: stop .automount first so it doesn't re-trigger
+        # the .mount we're about to stop.
+        if spec.automount:
+            _systemctl("disable", "--now", auto_unit, check=False)
+            (SYSTEMD_DIR / auto_unit).unlink(missing_ok=True)
+        _systemctl("disable", "--now", mount_unit, check=False)
+        (SYSTEMD_DIR / mount_unit).unlink(missing_ok=True)
 
 
 def _write_nginx_drop_in(record: InstalledApp) -> None:

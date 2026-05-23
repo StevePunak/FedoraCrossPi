@@ -63,6 +63,7 @@ IMAGE_INSTALL:append = " \
     gateway-ssl-init \
     gateway-admin-backend \
     gateway-admin-frontend \
+    tailscale \
 "
 
 # SSH only (no debug-tweaks, no root login, no empty password)

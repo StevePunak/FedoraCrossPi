@@ -1,0 +1,6 @@
+# Defaults for tailscaled. Most preferences (advertised routes, ssh, exit-node,
+# etc.) are stored in /data/tailscale/tailscaled.state by `tailscale up` and
+# do not need to be repeated here.
+
+PORT="41641"
+FLAGS=""

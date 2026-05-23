@@ -11,6 +11,7 @@ import shlex
 
 from app.models.app_install import InstalledApp
 from app.models.app_manifest import ServiceSpec
+from app.services.generators import app_mount
 
 
 def install_dir(app_id: str) -> str:
@@ -34,6 +35,14 @@ def generate_unit(app: InstalledApp, service: ServiceSpec) -> str:
         req_unit = unit_name(app.id, req)
         requires_lines.append(f"After={req_unit}")
         requires_lines.append(f"Requires={req_unit}")
+
+    # Every service depends on every declared mount: the daemon never
+    # starts against an empty mountpoint. .automount when lazy, .mount
+    # when eager — both keep the service correctly gated.
+    for spec in app.manifest.mounts:
+        mount_unit = app_mount.required_unit_name(spec)
+        requires_lines.append(f"After={mount_unit}")
+        requires_lines.append(f"Requires={mount_unit}")
 
     env_lines = [
         f"Environment={k}={shlex.quote(v)}"
