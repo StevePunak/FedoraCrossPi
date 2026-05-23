@@ -24,6 +24,8 @@ export default function Backup() {
   const [downloadPassphrase, setDownloadPassphrase] = useState("");
   const [downloadConfirm, setDownloadConfirm] = useState("");
   const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadBytes, setDownloadBytes] = useState(0);
+  const [downloadFiles, setDownloadFiles] = useState({ done: 0, total: 0 });
   const [downloadError, setDownloadError] = useState("");
 
   // Restore form state
@@ -35,13 +37,30 @@ export default function Backup() {
 
   const downloadFile = async () => {
     setDownloadError("");
+    setDownloadBytes(0);
+    setDownloadFiles({ done: 0, total: 0 });
     if (downloadPassphrase && downloadPassphrase !== downloadConfirm) {
       setDownloadError("Passphrases do not match.");
       return;
     }
     setDownloadBusy(true);
+    // Poll the backend's tar progress while the stream is in flight.
+    // Encrypted backups go through a buffered code path that doesn't
+    // update progress, so polling is harmless but won't move.
+    const pollHandle = setInterval(async () => {
+      try {
+        const p = await api.getBackupProgress();
+        if (p.phase !== "idle") {
+          setDownloadFiles({ done: p.files_done, total: p.files_total });
+        }
+      } catch { /* ignore poll errors */ }
+    }, 500);
     try {
-      const blob = await api.downloadBackup(includeSecrets, downloadPassphrase);
+      const blob = await api.downloadBackup(
+        includeSecrets,
+        downloadPassphrase,
+        (received) => setDownloadBytes(received),
+      );
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -54,6 +73,7 @@ export default function Backup() {
       setDownloadError(msg);
       alert(`Download failed: ${msg}`);
     } finally {
+      clearInterval(pollHandle);
       setDownloadBusy(false);
     }
   };
@@ -126,9 +146,22 @@ export default function Backup() {
         {downloadError && (
           <div style={{ color: "#d63031", fontSize: 13, marginBottom: 12 }}>{downloadError}</div>
         )}
-        <button style={btnStyle} onClick={downloadFile} disabled={downloadBusy}>
-          {downloadBusy ? "Building…" : "Download Backup"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button style={btnStyle} onClick={downloadFile} disabled={downloadBusy}>
+            {downloadBusy ? "Building…" : "Download Backup"}
+          </button>
+          {downloadBusy && (
+            <span style={{ fontSize: 13, color: "#636e72" }}>
+              {downloadFiles.total > 0 ? (
+                <>
+                  {downloadFiles.done} / {downloadFiles.total} files (
+                  {Math.round((downloadFiles.done / downloadFiles.total) * 100)}%) ·{" "}
+                </>
+              ) : null}
+              {(downloadBytes / 1024 / 1024).toFixed(1)} MB received
+            </span>
+          )}
+        </div>
       </Card>
 
       <Card title="Restore from Backup">
