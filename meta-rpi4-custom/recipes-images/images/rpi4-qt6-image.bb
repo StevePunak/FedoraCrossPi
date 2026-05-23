@@ -52,6 +52,7 @@ IMAGE_INSTALL:append = " \
     wpa-supplicant \
     taglib \
     taglib-dev \
+    libtorrent-rasterbar \
     python3 \
     python3-venv \
     cifs-utils \
@@ -92,3 +93,7 @@ ROOTFS_POSTPROCESS_COMMAND += "install_root_ssh_key;"
 # Generates a Qt 6 cross-compile SDK when running:
 #   bitbake -c populate_sdk rpi4-qt6-image
 inherit populate_sdk_qt6
+
+# Additional dev libraries shipped in the SDK's target sysroot
+# so cross-compiled Qt apps can link against them from the Fedora host.
+TOOLCHAIN_TARGET_TASK:append = " libtorrent-rasterbar-dev"

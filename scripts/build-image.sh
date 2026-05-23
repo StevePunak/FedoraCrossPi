@@ -26,12 +26,18 @@ case "${TARGET}" in
   *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway]" >&2; exit 1 ;;
 esac
 
-# Build the admin UI frontend bundle before the gateway image (recipe copies dist/)
+# Build the admin UI frontend bundle and download aarch64 backend wheels
+# before the gateway image (recipe copies dist/ and wheels/).
 if [ "${TARGET}" = "gateway" ] || [ "${TARGET}" = "qemu-gateway" ]; then
     FRONTEND_DIR="${REPO_ROOT}/gateway-admin/frontend"
     if [ -d "${FRONTEND_DIR}" ]; then
         echo "Building admin UI frontend..."
         (cd "${FRONTEND_DIR}" && npm install --silent && npm run build)
+    fi
+    BACKEND_DIR="${REPO_ROOT}/gateway-admin/backend"
+    if [ -x "${BACKEND_DIR}/refresh-wheels.sh" ]; then
+        echo "Downloading backend wheels..."
+        "${BACKEND_DIR}/refresh-wheels.sh"
     fi
 fi
 

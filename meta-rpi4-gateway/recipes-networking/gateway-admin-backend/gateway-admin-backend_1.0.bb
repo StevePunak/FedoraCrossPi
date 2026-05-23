@@ -19,6 +19,15 @@ do_install() {
     cp -r ${BACKEND_SRC}/app ${D}${INSTALL_PREFIX}/app
     install -m 0644 ${BACKEND_SRC}/requirements.txt ${D}${INSTALL_PREFIX}/requirements.txt
 
+    # Bundle aarch64 wheels so first-boot venv setup is fully offline.
+    # build-image.sh runs gateway-admin/backend/refresh-wheels.sh before
+    # kas build to populate ${BACKEND_SRC}/wheels.
+    if [ ! -d "${BACKEND_SRC}/wheels" ] || [ -z "$(ls -A ${BACKEND_SRC}/wheels 2>/dev/null)" ]; then
+        bbfatal "Backend wheels not found at ${BACKEND_SRC}/wheels. Run gateway-admin/backend/refresh-wheels.sh before building (scripts/build-image.sh does this automatically)."
+    fi
+    install -d ${D}${INSTALL_PREFIX}/wheels
+    cp ${BACKEND_SRC}/wheels/*.whl ${D}${INSTALL_PREFIX}/wheels/
+
     # Remove any dev artifacts
     rm -rf ${D}${INSTALL_PREFIX}/app/__pycache__ || true
     find ${D}${INSTALL_PREFIX}/app -name __pycache__ -type d -exec rm -rf {} + || true

@@ -34,6 +34,22 @@ IMAGE_INSTALL:append = " \
     tcpdump \
     bind-utils \
     openssl-bin \
+    sqlite3 \
+    libsqlite3-dev \
+    taglib \
+    taglib-c \
+    taglib-dev \
+    jq \
+    glibc-utils \
+    binutils \
+    iproute2-ss \
+    less \
+    lsof \
+    file \
+    strace \
+    tree \
+    nano \
+    python3-ipython \
     dnsmasq \
     dnsmasq-gateway-config \
     nginx \
@@ -89,12 +105,17 @@ disable_root_ssh() {
 
 # Install SSH public key into the gateway user's home
 install_gateway_ssh_key() {
+    # `install -d` runs as root and leaves the directories root-owned —
+    # including /home/gateway itself the first time it's auto-created
+    # under here. Without an explicit chown on the parent, the gateway
+    # user can't write anything in their own home (no .bash_history, no
+    # cache files, no .ssh/known_hosts updates, etc.).
+    # Host `chown` doesn't know target-side users/groups; use numeric IDs.
+    install -d -m 755 ${IMAGE_ROOTFS}/home/gateway
     install -d -m 700 ${IMAGE_ROOTFS}/home/gateway/.ssh
     install -m 600 ${THISDIR}/files/authorized_keys \
         ${IMAGE_ROOTFS}/home/gateway/.ssh/authorized_keys
-    # useradd -m creates the home dir owned by the user; chown to match
-    # Host `chown` doesn't know target-side users/groups; use numeric IDs.
-    chown -R ${GATEWAY_UID}:${GATEWAY_GID} ${IMAGE_ROOTFS}/home/gateway/.ssh
+    chown -R ${GATEWAY_UID}:${GATEWAY_GID} ${IMAGE_ROOTFS}/home/gateway
 }
 
 ROOTFS_POSTPROCESS_COMMAND += "install_sudoers; disable_root_ssh; install_gateway_ssh_key;"
