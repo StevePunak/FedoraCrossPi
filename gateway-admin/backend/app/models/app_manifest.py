@@ -148,19 +148,6 @@ class ConfigField(BaseModel):
         return self
 
 
-MOUNT_TYPES = ("cifs", "nfs", "nfs4", "bind", "tmpfs", "ext4")
-
-
-class MountCredentialsSpec(BaseModel):
-    # Names of two ConfigField entries (in the parent manifest's `config[]`)
-    # whose values become the username/password written to the credentials
-    # file. The fields' types must be "string" and "password" respectively.
-    username_field: str = Field(pattern=ENV_PATTERN)
-    password_field: str = Field(pattern=ENV_PATTERN)
-    # Optional third field for CIFS domain/workgroup.
-    domain_field: str | None = Field(default=None, pattern=ENV_PATTERN)
-
-
 class MountSpec(BaseModel):
     name: str = Field(pattern=SVC_PATTERN)
     # Source. CIFS: //host/share. NFS: host:/export. bind: an existing path.
@@ -168,15 +155,20 @@ class MountSpec(BaseModel):
     # Mount point. Absolute path; must not be "/" and must not contain "..".
     where: str
     type: Literal["cifs", "nfs", "nfs4", "bind", "tmpfs", "ext4"] = "cifs"
-    # Mount options, comma-separated. The installer appends `credentials=...`
-    # automatically when `credentials` is set; do not include it here yourself.
+    # Mount options, comma-separated. CIFS authors put their
+    # `credentials=/data/nas/credentials/<name>` here directly — credentials
+    # files are infrastructure the operator manages out-of-band, not
+    # installer-provisioned.
     options: str = ""
-    # When true, generates a paired .automount unit so the share is mounted
-    # on first access (lazy). Survives the NAS being unreachable at boot.
-    # When false, the .mount activates eagerly at boot.
-    automount: bool = False
-    # CIFS credentials. Honored only when type=="cifs".
-    credentials: MountCredentialsSpec | None = None
+    # When true (the default), the installer pairs the .mount with a
+    # .automount that watches the path and triggers the actual mount
+    # on first access. Lets the daemon boot even when the NAS is down;
+    # the mountpoint just looks empty until the share comes up.
+    automount: bool = True
+    # When set, emitted as `TimeoutIdleSec=` in the .automount section so
+    # systemd unmounts the share after the configured idle period and
+    # remounts on next access. Only meaningful when `automount` is true.
+    idle_timeout_seconds: int | None = Field(default=None, ge=1)
 
     @field_validator("where")
     @classmethod
@@ -188,23 +180,6 @@ class MountSpec(BaseModel):
         if ".." in v.split("/"):
             raise ValueError("where must not contain '..'")
         return v
-
-    @field_validator("options")
-    @classmethod
-    def _no_inline_credentials(cls, v: str) -> str:
-        for tok in v.split(","):
-            if tok.strip().startswith("credentials="):
-                raise ValueError(
-                    "do not put credentials= in options; declare a "
-                    "credentials: block and the installer writes the file"
-                )
-        return v
-
-    @model_validator(mode="after")
-    def _credentials_only_for_cifs(self):
-        if self.credentials is not None and self.type != "cifs":
-            raise ValueError("credentials: block is only valid for type=cifs")
-        return self
 
 
 class HooksSpec(BaseModel):
@@ -317,22 +292,5 @@ class AppManifest(BaseModel):
         mount_wheres = [m.where.rstrip("/") for m in self.mounts]
         if len(mount_wheres) != len(set(mount_wheres)):
             raise ValueError("mounts[].where values must be unique within an app")
-
-        config_keys = set(keys)
-        for m in self.mounts:
-            if m.credentials is None:
-                continue
-            for ref_name, ref in (
-                ("username_field", m.credentials.username_field),
-                ("password_field", m.credentials.password_field),
-                ("domain_field", m.credentials.domain_field),
-            ):
-                if ref is None:
-                    continue
-                if ref not in config_keys:
-                    raise ValueError(
-                        f"mount {m.name!r} credentials.{ref_name}={ref!r} "
-                        f"does not match any config[].key"
-                    )
 
         return self
