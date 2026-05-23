@@ -23,3 +23,11 @@ class InstalledApp(BaseModel):
     installed_at: datetime
     enabled: bool = True
     archive_sha256: str
+    # POSIX uid/gid the install_dir is chown'd to. Persisted so a
+    # post-reflash reconcile can re-create the app's system user with
+    # the *same* numeric IDs (the rootfs got wiped, /data didn't), keeping
+    # existing file ownership intact. Optional for records written before
+    # this field was added; reconcile re-captures the live ids in that
+    # case and writes them back.
+    uid: int | None = None
+    gid: int | None = None

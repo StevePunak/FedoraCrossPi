@@ -28,6 +28,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,6 +36,7 @@ from app.models.app_install import InstalledApp
 from app.models.app_manifest import AppManifest
 from app.services import app_store
 from app.services.generators import app_env, app_nginx, app_systemd
+from app.services.hooks import HookError, run_hook
 
 APPS_DIR = Path("/data/apps")
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -65,26 +67,50 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
     manifest = _read_manifest(archive_bytes)
     _check_compatibility(manifest)
 
-    if app_store.get(manifest.id) is not None:
-        raise InstallError(f"app {manifest.id!r} already installed; uninstall first")
-
     merged_config = _validate_config(manifest, config_values)
 
     install_dir = APPS_DIR / manifest.id
     user = f"app-{manifest.id}"
 
-    # Sweep any orphan state from a previous failed install of this id so
-    # the retry isn't blocked by stale dirs/units/drop-ins.
-    _rollback(manifest, install_dir)
-
-    install_dir.mkdir(parents=True, exist_ok=False)
+    # Install-over-existing-record is the supported "update" path. If we
+    # have a prior record AND an install_dir on disk (the normal case for
+    # an upgrade; also the post-restore case where the backup contained
+    # only `backup_paths` subtrees), snapshot those subtrees aside so we
+    # can move them back over the freshly-extracted archive. Restore is
+    # how downloads/state/db survive a binary swap.
+    prior_record = app_store.get(manifest.id)
+    snapshot_dir: Path | None = None
+    if prior_record is not None and install_dir.exists():
+        keep = _effective_backup_paths(prior_record.manifest)
+        if keep:
+            snapshot_dir = Path(tempfile.mkdtemp(prefix=f"app-{manifest.id}-snap-"))
+            for kp in keep:
+                src = install_dir / kp
+                if src.exists():
+                    shutil.copytree(src, snapshot_dir / kp, symlinks=True)
 
     try:
+        # Sweep any orphan state from a previous install / failed install
+        # of this id so extraction isn't blocked by stale dirs/units.
+        _rollback(manifest, install_dir)
+        install_dir.mkdir(parents=True, exist_ok=False)
+
         _extract_archive(archive_bytes, install_dir)
         _ensure_user(user)
+        uid, gid = _lookup_user_ids(user)
 
         for sub in manifest.data_dirs:
             (install_dir / sub).mkdir(parents=True, exist_ok=True)
+
+        # Move the snapshot back over the freshly-extracted tree. The
+        # archive's data_dirs are empty templates; the snapshot is the
+        # real persisted state.
+        if snapshot_dir is not None:
+            for entry in snapshot_dir.iterdir():
+                target = install_dir / entry.name
+                if target.exists():
+                    shutil.rmtree(target)
+                shutil.move(str(entry), str(target))
 
         _run("chown", "-R", f"{user}:{user}", str(install_dir))
 
@@ -96,6 +122,8 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
             installed_at=datetime.now(timezone.utc),
             enabled=True,
             archive_sha256=sha256,
+            uid=uid,
+            gid=gid,
         )
 
         _run_hook(manifest, install_dir, "pre_install", merged_config)
@@ -104,19 +132,36 @@ def install(archive_bytes: bytes, config_values: dict | None = None) -> Installe
         _write_nginx_drop_in(record)
 
         _systemctl("daemon-reload")
+
+        # post_install runs before services start so hooks can prep runtime
+        # artifacts the units depend on (e.g. building a Python venv from
+        # bundled wheels). Otherwise systemd races the hook and ExecStart
+        # hits ENOENT until restart-on-failure recovers.
+        _run_hook(manifest, install_dir, "post_install", merged_config)
+
         for svc in manifest.services:
             unit = app_systemd.unit_name(manifest.id, svc.name)
             _systemctl("enable", "--now", unit)
         if manifest.web_ui is not None:
             _run("nginx", "-s", "reload", check=False)
 
-        _run_hook(manifest, install_dir, "post_install", merged_config)
-
         app_store.upsert(record)
         return record
     except Exception:
         _rollback(manifest, install_dir)
         raise
+    finally:
+        if snapshot_dir is not None:
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
+
+
+def _effective_backup_paths(manifest: AppManifest) -> list[str]:
+    """Subpaths inside install_dir that should survive an install-over
+    (and that the gateway backup should include). `backup_paths is None`
+    means fall back to `data_dirs`; an empty list is explicit opt-out;
+    a list is the override."""
+    paths = manifest.backup_paths if manifest.backup_paths is not None else manifest.data_dirs
+    return [p.strip("/") for p in paths if p.strip("/")]
 
 
 def _rollback(manifest: AppManifest, install_dir: Path) -> None:
@@ -214,22 +259,69 @@ def status(app_id: str) -> dict[str, str]:
 
 
 def reconcile() -> list[str]:
-    """Re-materialize systemd units, nginx drop-ins, and config.env from
-    the persisted record set. Called at startup; cheap if nothing's
-    installed and idempotent if the world already matches state."""
+    """Re-materialize the runtime side of every installed app from the
+    persisted records. Called at startup; idempotent. After a reflash
+    /data survives but the rootfs is fresh — no app users, no unit files
+    in /etc/systemd/system, no enable symlinks. This brings them all back.
+
+    Steps per record:
+      1. Ensure the app's system user exists with the *same* uid/gid the
+         install_dir is chown'd to (record-pinned if present, otherwise
+         captured now and written back).
+      2. Re-chown install_dir defensively in case the user pre-existed
+         with a different uid.
+      3. Rewrite config.env / units / nginx drop-in from the record.
+      4. Enable + start each service for apps marked enabled. (Install
+         did `enable --now`; the wants/ symlink lives on rootfs, so a
+         reflash wipes it and we have to redo this every boot.)
+    """
+    any_web_ui = False
+    needs_daemon_reload = False
     actions: list[str] = []
     for record in app_store.get_all():
         install_dir = APPS_DIR / record.id
         if not install_dir.exists():
             actions.append(f"warn: install dir missing for {record.id}")
             continue
+
+        user = f"app-{record.id}"
+        _ensure_user(user, uid=record.uid, gid=record.gid)
+        # If the record predates uid/gid persistence (or the user was
+        # somehow re-created with different ids), capture the current
+        # ids and write them back so the next reflash has them pinned.
+        live_uid, live_gid = _lookup_user_ids(user)
+        if record.uid != live_uid or record.gid != live_gid:
+            record = record.model_copy(update={"uid": live_uid, "gid": live_gid})
+            app_store.upsert(record)
+
+        _run("chown", "-R", f"{user}:{user}", str(install_dir), check=False)
+
         _write_config_env(record)
         _write_systemd_units(record)
         _write_nginx_drop_in(record)
+        needs_daemon_reload = True
+        if record.manifest.web_ui is not None:
+            any_web_ui = True
         actions.append(f"reconciled {record.id}")
-    if actions:
+
+    if needs_daemon_reload:
         _systemctl("daemon-reload", check=False)
+    if any_web_ui:
         _run("nginx", "-s", "reload", check=False)
+
+    # Now that units are loaded, enable+start each service for enabled
+    # apps. Done in a second pass after daemon-reload so systemd sees
+    # the freshly-written unit files.
+    for record in app_store.get_all():
+        if not record.enabled:
+            continue
+        install_dir = APPS_DIR / record.id
+        if not install_dir.exists():
+            continue
+        for svc in record.manifest.services:
+            unit = app_systemd.unit_name(record.id, svc.name)
+            _systemctl("enable", "--now", unit, check=False)
+
     return actions
 
 
@@ -358,11 +450,41 @@ def _extract_archive(archive_bytes: bytes, dest: Path) -> None:
     tf.extractall(dest, filter="data")
 
 
-def _ensure_user(name: str) -> None:
+def _ensure_user(name: str, uid: int | None = None, gid: int | None = None) -> None:
+    """Create the per-app system user+group if missing. When uid/gid are
+    supplied (after a reflash, recovered from the InstalledApp record),
+    re-create with those exact numeric ids so file ownership in /data
+    still matches. Without them, useradd picks the next free system id
+    and the install_dir would need a chown.
+    """
     rc, _ = _run("id", "-u", name, check=False)
     if rc == 0:
         return
-    _run("useradd", "-r", "-M", "-s", "/usr/sbin/nologin", name)
+    if gid is not None:
+        # Create the group first so we can pin -g; useradd -U would
+        # otherwise create one with whatever gid happens to be free.
+        _run("groupadd", "-r", "-g", str(gid), name, check=False)
+        args = ["useradd", "-r", "-M", "-s", "/usr/sbin/nologin", "-g", str(gid)]
+        if uid is not None:
+            args += ["-u", str(uid)]
+        _run(*args, name)
+    else:
+        # No pinning requested. -U makes useradd create a same-name group
+        # with the same id as the user (the original behavior).
+        _run("useradd", "-r", "-M", "-U", "-s", "/usr/sbin/nologin", name)
+
+
+def _lookup_user_ids(name: str) -> tuple[int, int]:
+    """Resolve a user name to (uid, gid). Caller must ensure the user
+    already exists; raises InstallError on lookup failure so the install
+    path can roll back."""
+    rc, uid_txt = _run("id", "-u", name, check=False)
+    if rc != 0:
+        raise InstallError(f"user {name!r} not found after _ensure_user")
+    rc, gid_txt = _run("id", "-g", name, check=False)
+    if rc != 0:
+        raise InstallError(f"group lookup failed for {name!r}")
+    return int(uid_txt), int(gid_txt)
 
 
 def _write_config_env(record: InstalledApp) -> None:
@@ -396,33 +518,9 @@ def _run_hook(
     hook_name: str,
     config_values: dict,
 ) -> None:
-    rel = getattr(manifest.hooks, hook_name)
-    if not rel:
-        return
-
-    hook_path = install_dir / rel
-    if not hook_path.exists():
-        raise InstallError(f"hook {hook_name} script not found: {hook_path}")
-    hook_path.chmod(0o755)
-
-    env = os.environ.copy()
-    env.update({
-        "APP_ID": manifest.id,
-        "APP_VERSION": manifest.version,
-        "INSTALL_DIR": str(install_dir),
-        "DATA_DIR": str(install_dir),
-    })
-    for k, v in config_values.items():
-        env[k] = str(v)
-
-    result = subprocess.run(
-        [str(hook_path)],
-        cwd=install_dir,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise InstallError(
-            f"hook {hook_name} failed (exit {result.returncode}): {result.stderr.strip()}"
-        )
+    # Thin shim over services.hooks.run_hook: callers in this module raise
+    # InstallError on lifecycle failures, so translate the generic HookError.
+    try:
+        run_hook(manifest, install_dir, hook_name, config_values)
+    except HookError as e:
+        raise InstallError(str(e)) from e

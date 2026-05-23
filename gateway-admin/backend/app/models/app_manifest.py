@@ -90,8 +90,26 @@ class WebUiSpec(BaseModel):
     path: str | None = None
     # If true, nginx strips `path` before forwarding (the app sees clean URLs).
     strip_prefix: bool = True
-    # v1: always true. Field exists so future installs can opt out per-app.
-    requires_admin: bool = True
+    # Who's allowed to reach this app's web UI through the gateway:
+    #   "none"  — no gateway-level gate. The app is reachable from the LAN.
+    #             Auth (if the app wants it) is the app's own concern.
+    #   "admin" — nginx auth_request gates the proxy on a valid
+    #             gateway-admin session cookie. Suited to ops-only tools.
+    # Defaults to "none" because admin gating is the *wrong* layer for
+    # most apps — users of a torrent UI / media player aren't appliance
+    # admins. Apps with their own user model build it themselves.
+    gateway_auth: Literal["none", "admin"] = "none"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_requires_admin(cls, data):
+        # Existing installed.json records (pre-2026-05-10) carry
+        # `requires_admin: bool`. Convert on read so persisted state
+        # doesn't reject parse after the schema rename.
+        if isinstance(data, dict) and "requires_admin" in data and "gateway_auth" not in data:
+            data = dict(data)
+            data["gateway_auth"] = "admin" if data.pop("requires_admin") else "none"
+        return data
 
     @field_validator("path")
     @classmethod
@@ -137,6 +155,13 @@ class HooksSpec(BaseModel):
     pre_install: str | None = None
     post_install: str | None = None
     pre_uninstall: str | None = None
+    # Backup hooks: pre_backup quiesces the app before the gateway tars
+    # /data (e.g. stop the daemon so a SQLite-in-WAL file is consistent on
+    # disk); post_backup brings it back afterwards. pre_backup failure
+    # aborts the whole backup; post_backup is best-effort. See
+    # services/backup.py for the orchestration.
+    pre_backup: str | None = None
+    post_backup: str | None = None
 
 
 class HealthSpec(BaseModel):
@@ -169,6 +194,15 @@ class AppManifest(BaseModel):
 
     # Subpaths created under /data/apps/<id>/. Must be relative, no ".." segments.
     data_dirs: list[str] = []
+    # Subpaths inside /data/apps/<id>/ preserved by the gateway backup +
+    # by install-over-existing (the update path). `None` (the default)
+    # means fall back to `data_dirs` — that's what app authors usually
+    # want and existing manifests get sensible behavior for free. An
+    # empty list is an explicit opt-out (nothing app-specific in the
+    # backup, app is fully rebuildable from the archive). A non-empty
+    # list overrides data_dirs (e.g. a subset of data_dirs that excludes
+    # large reproducible caches).
+    backup_paths: list[str] | None = None
     config: list[ConfigField] = []
     hooks: HooksSpec = HooksSpec()
     health: HealthSpec | None = None
@@ -180,12 +214,14 @@ class AppManifest(BaseModel):
             raise ValueError(f"not a valid semver: {v!r}")
         return v
 
-    @field_validator("data_dirs")
+    @field_validator("data_dirs", "backup_paths")
     @classmethod
-    def _no_traversal(cls, v: list[str]) -> list[str]:
+    def _no_traversal(cls, v):
+        if v is None:
+            return v
         for d in v:
             if not d or d.startswith("/") or ".." in d.split("/"):
-                raise ValueError(f"data_dirs entries must be relative, non-empty, and free of '..': {d!r}")
+                raise ValueError(f"entries must be relative, non-empty, and free of '..': {d!r}")
         return v
 
     @model_validator(mode="after")

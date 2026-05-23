@@ -6,9 +6,10 @@ The drop-in is included from inside the main 443 server{} block via:
     include /etc/nginx/locations.d/apps/*.conf;
 
 Each app gets exactly one file at /etc/nginx/locations.d/apps/<id>.conf.
-When `requires_admin` is true (the v1 default), the location uses
-auth_request against /api/auth/check, which is served by the admin
-backend and returns 200 only for authenticated sessions.
+Auth gating is controlled by `web_ui.gateway_auth`: `"admin"` adds
+`auth_request /api/auth/check` so only a logged-in gateway admin can
+reach the proxy. `"none"` (the default) leaves the location open and
+delegates access control to the app.
 """
 
 from app.models.app_install import InstalledApp
@@ -30,7 +31,7 @@ def generate(app: InstalledApp) -> str | None:
     proxy_target = f"{upstream}/" if web.strip_prefix else upstream
 
     auth_lines: list[str] = []
-    if web.requires_admin:
+    if web.gateway_auth == "admin":
         auth_lines = [
             "    auth_request /api/auth/check;",
             "",
