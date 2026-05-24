@@ -1,0 +1,13 @@
+[Unit]
+Description=Renew Let's Encrypt certificates via acme.sh
+Documentation=https://github.com/acmesh-official/acme.sh
+Requires=acme-bootstrap.service network-online.target
+After=acme-bootstrap.service network-online.target
+
+[Service]
+Type=oneshot
+# Optional EnvironmentFile (leading dash): on a fresh card before manual
+# credential setup, the file won't exist yet and the service should still
+# load. acme.sh --cron is a no-op without tracked certs.
+EnvironmentFile=-/data/acme/godaddy.env
+ExecStart=/data/acme/acme.sh --home /data/acme --cron

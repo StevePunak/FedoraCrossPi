@@ -36,7 +36,7 @@ log = logging.getLogger("gateway-admin")
 ENCRYPTED_HEADER = b"GWADMIN-ENC-V1\n"
 
 # Files to exclude when include_secrets is False
-SECRET_PATHS = {"auth.json", "ssl"}
+SECRET_PATHS = {"auth.json", "ssl", "acme"}
 
 
 class BackupError(Exception):

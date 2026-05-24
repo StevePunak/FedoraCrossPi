@@ -1,0 +1,13 @@
+[Unit]
+Description=Stage acme.sh from rootfs into /data/acme
+Documentation=file:///usr/sbin/acme-bootstrap.sh
+RequiresMountsFor=/data
+Before=acme-renew.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/acme-bootstrap.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

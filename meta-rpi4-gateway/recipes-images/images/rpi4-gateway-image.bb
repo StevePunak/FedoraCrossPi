@@ -86,6 +86,7 @@ IMAGE_INSTALL:append = " \
     gateway-admin-backend \
     gateway-admin-frontend \
     tailscale \
+    acme-sh \
 "
 
 # SSH only (no debug-tweaks, no root login, no empty password)
