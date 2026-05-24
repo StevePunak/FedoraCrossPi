@@ -37,6 +37,18 @@ const tdStyle: React.CSSProperties = {
   borderBottom: "1px solid #f0f0f0",
 };
 
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  // Floor so the Remove + Add buttons don't get clipped on phone-width cards.
+  minWidth: 500,
+  borderCollapse: "collapse",
+  fontSize: 14,
+};
+
+const tableWrapperStyle: React.CSSProperties = {
+  overflowX: "auto",
+};
+
 export default function DNS() {
   const [config, setConfig] = useState<DnsConfig | null>(null);
   const [hosts, setHosts] = useState<HostEntry[]>([]);
@@ -111,7 +123,8 @@ export default function DNS() {
       </Card>
 
       <Card title="Host Entries">
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+        <div style={tableWrapperStyle}>
+        <table style={tableStyle}>
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 150 }}>IP Address</th>
@@ -154,6 +167,7 @@ export default function DNS() {
             </tr>
           </tbody>
         </table>
+        </div>
       </Card>
 
       <div style={{ marginBottom: 24 }}>

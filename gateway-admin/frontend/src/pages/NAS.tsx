@@ -171,7 +171,8 @@ export default function NAS() {
           <p style={{ color: "#636e72", margin: 0 }}>No mounts configured.</p>
         )}
         {statuses.length > 0 && (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <div style={tableWrapperStyle}>
+          <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>ID</th>
@@ -198,6 +199,7 @@ export default function NAS() {
               })}
             </tbody>
           </table>
+          </div>
         )}
         <div style={{ marginTop: 12 }}>
           <button style={smallBtn} onClick={refreshStatus}>Refresh</button>
@@ -210,7 +212,7 @@ export default function NAS() {
         const isTesting = testing[key];
         return (
           <Card key={idx} title={`Mount ${idx + 1}${mount.id ? `: ${mount.id}` : ""}`}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={formGridStyle}>
               <FormField label="ID (slug)">
                 <input
                   style={inputStyle}
@@ -329,4 +331,25 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: "8px 12px",
   borderBottom: "1px solid #f0f0f0",
+};
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  // Floor so the Last Error column isn't crushed off-screen on a phone-width card.
+  minWidth: 520,
+  borderCollapse: "collapse",
+  fontSize: 14,
+};
+
+const tableWrapperStyle: React.CSSProperties = {
+  overflowX: "auto",
+};
+
+// Two-up form grid that collapses to one column on narrow viewports without
+// needing a JS isMobile flag — auto-fit drops the second column whenever
+// 2×280 + gap won't fit.
+const formGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 14,
 };

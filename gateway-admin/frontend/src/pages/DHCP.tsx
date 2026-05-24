@@ -5,6 +5,7 @@ import Card from "../components/Card";
 import FormField, { inputStyle } from "../components/FormField";
 import Preview from "../components/Preview";
 import { useDebounced } from "../hooks/useDebounced";
+import { useMediaQuery, MOBILE_QUERY } from "../hooks/useMediaQuery";
 
 const btnStyle: React.CSSProperties = {
   padding: "8px 20px",
@@ -25,8 +26,53 @@ const dangerBtn: React.CSSProperties = {
 
 const tableStyle: React.CSSProperties = {
   width: "100%",
+  // Floor for narrow viewports: tables clip awkwardly when crammed into a
+  // phone-width card. Combined with tableWrapperStyle.overflowX: auto, the
+  // table keeps readable columns and the wrapper scrolls horizontally.
+  // 1000px gives 6 columns of MAC/IP-sized inputs (Static Leases) or
+  // 6 read-only columns including the new Vendor field (Active Leases)
+  // room to show full values without clipping.
+  minWidth: 1000,
   borderCollapse: "collapse",
   fontSize: 14,
+};
+
+const tableWrapperStyle: React.CSSProperties = {
+  overflowX: "auto",
+};
+
+// Mobile-only card layout for the editable Static Leases list. Each lease
+// renders as a vertically-stacked card with label/value pairs so the inputs
+// can use full card width instead of getting squeezed into table cells.
+const leaseCardStyle: React.CSSProperties = {
+  background: "#fff",
+  border: "1px solid #dfe6e9",
+  borderRadius: 6,
+  padding: 12,
+  marginBottom: 10,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const leaseFieldRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const leaseFieldLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: "#636e72",
+  fontWeight: 600,
+  width: 80,
+  flexShrink: 0,
+};
+
+const leaseFieldInputStyle: React.CSSProperties = {
+  ...inputStyle,
+  flex: 1,
+  minWidth: 0,
 };
 
 const thStyle: React.CSSProperties = {
@@ -90,6 +136,8 @@ export default function DHCP() {
   useEffect(() => {
     if (debounced.config) api.previewDhcp(debounced.config, debounced.leases).then(setPreview);
   }, [debounced]);
+
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   if (!config) return <p>Loading...</p>;
 
@@ -229,32 +277,139 @@ export default function DHCP() {
         ) : active.length === 0 ? (
           <p style={{ color: "#636e72", fontSize: 13 }}>No active leases.</p>
         ) : (
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>IP Address</th>
-                <th style={thStyle}>MAC Address</th>
-                <th style={thStyle}>Hostname</th>
-                <th style={thStyle}>Client ID</th>
-                <th style={thStyle}>Expires In</th>
-              </tr>
-            </thead>
-            <tbody>
-              {active.map((lease, idx) => (
-                <tr key={`${lease.mac}-${lease.ip}-${idx}`}>
-                  <td style={tdStyle}>{lease.ip}</td>
-                  <td style={tdStyle} title={lease.mac}>{lease.mac}</td>
-                  <td style={tdStyle}>{lease.hostname || <span style={{ color: "#b2bec3" }}>—</span>}</td>
-                  <td style={tdStyle}>{lease.client_id || <span style={{ color: "#b2bec3" }}>—</span>}</td>
-                  <td style={tdStyle}>{formatExpires(lease.expires_at)}</td>
+          <div style={tableWrapperStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>IP Address</th>
+                  <th style={thStyle}>MAC Address</th>
+                  <th style={thStyle}>Vendor</th>
+                  <th style={thStyle}>Hostname</th>
+                  <th style={thStyle}>Client ID</th>
+                  <th style={thStyle}>Expires In</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {active.map((lease, idx) => (
+                  <tr key={`${lease.mac}-${lease.ip}-${idx}`}>
+                    <td style={tdStyle}>{lease.ip}</td>
+                    <td style={tdStyle} title={lease.mac}>{lease.mac}</td>
+                    <td style={tdStyle}>{lease.vendor || <span style={{ color: "#b2bec3" }}>—</span>}</td>
+                    <td style={tdStyle}>{lease.hostname || <span style={{ color: "#b2bec3" }}>—</span>}</td>
+                    <td style={tdStyle}>{lease.client_id || <span style={{ color: "#b2bec3" }}>—</span>}</td>
+                    <td style={tdStyle}>{formatExpires(lease.expires_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
       <Card title="Static Leases">
+        {isMobile ? (
+          <div>
+            {leases.map((lease, idx) => (
+              <div
+                key={idx}
+                style={{ ...leaseCardStyle, opacity: lease.enabled ? 1 : 0.6 }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={lease.enabled}
+                      onChange={(e) => updateLease(idx, "enabled", e.target.checked)}
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <button style={dangerBtn} onClick={() => removeLease(idx)}>Remove</button>
+                </div>
+                <div style={leaseFieldRowStyle}>
+                  <span style={leaseFieldLabelStyle}>MAC</span>
+                  <input
+                    style={leaseFieldInputStyle}
+                    value={lease.mac}
+                    onChange={(e) => updateLease(idx, "mac", e.target.value)}
+                  />
+                </div>
+                <div style={leaseFieldRowStyle}>
+                  <span style={leaseFieldLabelStyle}>IP</span>
+                  <input
+                    style={leaseFieldInputStyle}
+                    value={lease.ip}
+                    onChange={(e) => updateLease(idx, "ip", e.target.value)}
+                  />
+                </div>
+                <div style={leaseFieldRowStyle}>
+                  <span style={leaseFieldLabelStyle}>Hostname</span>
+                  <input
+                    style={leaseFieldInputStyle}
+                    value={lease.hostname}
+                    onChange={(e) => updateLease(idx, "hostname", e.target.value)}
+                  />
+                </div>
+                <div style={leaseFieldRowStyle}>
+                  <span style={leaseFieldLabelStyle}>Comment</span>
+                  <input
+                    style={leaseFieldInputStyle}
+                    value={lease.comment}
+                    onChange={(e) => updateLease(idx, "comment", e.target.value)}
+                    placeholder="optional"
+                  />
+                </div>
+              </div>
+            ))}
+            <div style={{ ...leaseCardStyle, background: "#f5f6fa", borderColor: "#74b9ff" }}>
+              <div style={{ fontSize: 13, color: "#0984e3", fontWeight: 600 }}>
+                Add new lease
+              </div>
+              <div style={leaseFieldRowStyle}>
+                <span style={leaseFieldLabelStyle}>MAC</span>
+                <input
+                  style={leaseFieldInputStyle}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                  value={newLease.mac}
+                  onChange={(e) => setNewLease({ ...newLease, mac: e.target.value })}
+                />
+              </div>
+              <div style={leaseFieldRowStyle}>
+                <span style={leaseFieldLabelStyle}>IP</span>
+                <input
+                  style={leaseFieldInputStyle}
+                  placeholder="192.168.0.100"
+                  value={newLease.ip}
+                  onChange={(e) => setNewLease({ ...newLease, ip: e.target.value })}
+                />
+              </div>
+              <div style={leaseFieldRowStyle}>
+                <span style={leaseFieldLabelStyle}>Hostname</span>
+                <input
+                  style={leaseFieldInputStyle}
+                  placeholder="hostname"
+                  value={newLease.hostname}
+                  onChange={(e) => setNewLease({ ...newLease, hostname: e.target.value })}
+                />
+              </div>
+              <div style={leaseFieldRowStyle}>
+                <span style={leaseFieldLabelStyle}>Comment</span>
+                <input
+                  style={leaseFieldInputStyle}
+                  placeholder="optional"
+                  value={newLease.comment}
+                  onChange={(e) => setNewLease({ ...newLease, comment: e.target.value })}
+                />
+              </div>
+              <button
+                style={{ ...btnStyle, background: "#00b894", alignSelf: "flex-start" }}
+                onClick={addLease}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        ) : (
+        <div style={tableWrapperStyle}>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -321,6 +476,8 @@ export default function DHCP() {
             </tr>
           </tbody>
         </table>
+        </div>
+        )}
       </Card>
 
       <div style={{ marginBottom: 24 }}>
