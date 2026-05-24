@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -30,7 +30,15 @@ export default function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const { refresh } = useAuth();
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Same-origin path only — reject anything that doesn't start with a single
+  // "/", including protocol-relative "//host/" forms that browsers treat as
+  // absolute and would let a crafted link open-redirect post-login.
+  const nextParam = searchParams.get("next");
+  const redirectTo =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +47,11 @@ export default function Login() {
     try {
       await api.login(username, password);
       await refresh();
-      navigate("/");
+      // Hard navigation, not React Router. `redirectTo` can point at
+      // /apps/<id>/... which lives outside this SPA bundle; a client-side
+      // route push would fall through to the catch-all and never make the
+      // real HTTP request that re-presents the new session cookie.
+      window.location.href = redirectTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : "login failed");
     } finally {
@@ -66,6 +78,9 @@ export default function Login() {
           </label>
           <input
             style={inputStyle}
+            name="username"
+            id="username"
+            autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoFocus
@@ -78,7 +93,10 @@ export default function Login() {
           </label>
           <input
             style={inputStyle}
+            name="password"
+            id="password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

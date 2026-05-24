@@ -32,8 +32,17 @@ def generate(app: InstalledApp) -> str | None:
 
     auth_lines: list[str] = []
     if web.gateway_auth == "admin":
+        # Tailnet (100.64.0.0/10, fd7a:115c:a1e0::/48) skips the
+        # auth_request — Tailscale device identity is the auth. Non-tailnet
+        # sources fall through to the admin session check; 401s bounce to
+        # /login via the @to_login named location in default.conf.
         auth_lines = [
+            "    satisfy any;",
+            "    allow 100.64.0.0/10;",
+            "    allow fd7a:115c:a1e0::/48;",
+            "    deny all;",
             "    auth_request /api/auth/check;",
+            "    error_page 401 = @to_login;",
             "",
         ]
 
