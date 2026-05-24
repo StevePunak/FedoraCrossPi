@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 
 from app.models.schemas import ActiveLease
+from app.services.oui import lookup_vendor
 
 
 def _leasefile() -> Path:
@@ -44,6 +45,7 @@ def get_active_leases() -> list[ActiveLease]:
                 ip=parts[2],
                 hostname=hostname,
                 client_id=client_id,
+                vendor=lookup_vendor(parts[1]),
             )
         )
     return leases

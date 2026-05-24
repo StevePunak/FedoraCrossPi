@@ -75,6 +75,9 @@ export interface ActiveLease {
   ip: string;
   hostname: string;
   client_id: string;
+  // Manufacturer short name from the MAC's OUI prefix (Wireshark `manuf`).
+  // `null` when the prefix is unknown or the lookup table is unavailable.
+  vendor: string | null;
 }
 
 export interface DnsConfig {

@@ -63,6 +63,10 @@ class ActiveLease(BaseModel):
     ip: str
     hostname: str
     client_id: str
+    # Manufacturer short name derived from the MAC's OUI prefix. Populated
+    # by app/services/oui.py against the bundled Wireshark manuf file;
+    # None when the prefix isn't in the table or the file is missing.
+    vendor: str | None = None
 
 
 class DnsConfig(BaseModel):
