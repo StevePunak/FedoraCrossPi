@@ -6,6 +6,7 @@ SRC_URI = " \
     file://irrigationd.service \
     file://irrigationd.ini \
 "
+S = "${UNPACKDIR}"
 
 do_install() {
     install -d ${D}${sysconfdir}

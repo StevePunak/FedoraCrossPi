@@ -3,17 +3,18 @@ Description=Irrigation controller daemon
 Documentation=https://github.com/StevePunak/irrigation
 After=network-online.target time-sync.target
 Wants=network-online.target
+# A repeatable startup failure must never let the rate limiter park this
+# unit failed: no process running means no process holding the GPIO
+# lines, and released lines float to whatever the pad pull-down leaves
+# asserted on a LOW-trigger board. This key only takes effect in [Unit];
+# systemd silently ignores it under [Service].
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/irrigationd --config /etc/irrigationd.ini
 Restart=always
 RestartSec=5
-# A repeatable startup failure must never let the rate limiter park this
-# unit failed: no process running means no process holding the GPIO
-# lines, and released lines float to whatever the pad pull-down leaves
-# asserted on a LOW-trigger board.
-StartLimitIntervalSec=0
 TimeoutStopSec=30
 WorkingDirectory=/var/lib/irrigationd
 
