@@ -35,11 +35,25 @@ IMAGE_INSTALL:append = " \
 
 IMAGE_FEATURES += "ssh-server-openssh package-management"
 
-PACKAGE_CLASSES = "package_rpm"
-
 # Two sites both claiming default_server on :80 stops nginx from starting at all.
 remove_stock_nginx_site() {
-    rm -f ${IMAGE_ROOTFS}${sysconfdir}/nginx/sites-enabled/default_server
+    stock_site="${IMAGE_ROOTFS}${sysconfdir}/nginx/sites-enabled/default_server"
+    if [ ! -e "$stock_site" ]; then
+        bbfatal "expected ${sysconfdir}/nginx/sites-enabled/default_server in the rootfs to remove; nginx-irrigation-config's default_server collision may already be back"
+    fi
+    rm -f "$stock_site"
 }
 
 ROOTFS_POSTPROCESS_COMMAND += "remove_stock_nginx_site"
+
+# RPI_EXTRA_CONFIG is a plain assignment: a later kas fragment (a private
+# overlay, most likely) that also sets it for an unrelated reason silently
+# drops every relay hold-down with a clean build and no error anywhere.
+assert_gpio_safety_line() {
+    generated="${DEPLOY_DIR_IMAGE}/bootfiles/config.txt"
+    if ! grep -q 'gpio=5,6,13,16,19,20,21,26=op,dh' "$generated"; then
+        bbfatal "gpio=5,6,13,16,19,20,21,26=op,dh missing from $generated — RPI_EXTRA_CONFIG did not reach the boot partition, and the relay lines come up unheld"
+    fi
+}
+
+IMAGE_POSTPROCESS_COMMAND += "assert_gpio_safety_line"
