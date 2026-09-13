@@ -23,7 +23,11 @@ case "${TARGET}" in
     KAS_FILE="${REPO_ROOT}/kas/qemu-gateway.yml"
     PRIVATE_KAS=""
     ;;
-  *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway]" >&2; exit 1 ;;
+  irrigation)
+    KAS_FILE="${REPO_ROOT}/kas/rpi4-irrigation.yml"
+    PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-irrigation-private/kas/private.yml"
+    ;;
+  *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway|irrigation]" >&2; exit 1 ;;
 esac
 
 # Build the admin UI frontend bundle and download aarch64 backend wheels

@@ -1,0 +1,82 @@
+header:
+  version: 14
+
+machine: raspberrypi4-64
+distro: poky
+target: rpi4-irrigation-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: walnascar
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded
+    branch: walnascar
+    layers:
+      meta-oe:
+      meta-networking:
+      meta-python:
+      meta-webserver:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi
+    branch: walnascar
+    layers:
+      .:
+
+  meta-qt6:
+    url: https://code.qt.io/yocto/meta-qt6.git
+    branch: "6.10"
+    layers:
+      .:
+
+  meta-rpi4-irrigation:
+    path: meta-rpi4-irrigation
+    layers:
+      .:
+
+local_conf_header:
+  meta-rpi4-irrigation: |
+    # Init system
+    INIT_MANAGER = "systemd"
+
+    # Headless controller — no display, no audio, no compositor
+    DISTRO_FEATURES:remove = "x11 directfb vulkan wayland opengl"
+    DISTRO_FEATURES:append = " pam"
+
+    GPU_MEM = "16"
+    ENABLE_UART = "1"
+
+    # Accept restricted licenses required for RPi WiFi/BT firmware
+    LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
+
+    # meta-qt6 enables the SQLite driver only through PACKAGECONFIG_KDE,
+    # which is gated on the kde distro feature. A headless image never sets
+    # it, so without this line qtbase builds with no SQL drivers and
+    # QSqlDatabase::addDatabase("QSQLITE") fails at runtime on a clean build.
+    PACKAGECONFIG:append:pn-qtbase = " sql-sqlite"
+
+    # meta-oe carries libgpiod 1.6.5 and 2.2.2 side by side and their APIs
+    # share no call signatures.
+    PREFERRED_VERSION_libgpiod = "2.2.2"
+
+    # The gpio= line drives the relay inputs high — the inactive level for a
+    # LOW-trigger board — from the bootloader onward. Six of the eight zone
+    # lines come up asserted without it, because BCM 9-27 default to pull-down.
+    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,13,16,19,20,21,26=op,dh'
+
+    # Shared caches
+    DL_DIR ?= "${TOPDIR}/../downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+
+    # Auto-clean work directories after each package builds
+    INHERIT += "rm_work"
+
+    # Parallelism — 48 cores
+    BB_NUMBER_THREADS = "48"
+    PARALLEL_MAKE = "-j 48"

@@ -22,7 +22,12 @@ case "${TARGET}" in
     PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-gateway-private/kas/private.yml"
     IMAGE="rpi4-gateway-image"
     ;;
-  *) echo "Usage: $0 [rpi4|rpi5|gateway]" >&2; exit 1 ;;
+  irrigation)
+    KAS_FILE="${REPO_ROOT}/kas/rpi4-irrigation.yml"
+    PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-irrigation-private/kas/private.yml"
+    IMAGE="rpi4-irrigation-image"
+    ;;
+  *) echo "Usage: $0 [rpi4|rpi5|gateway|irrigation]" >&2; exit 1 ;;
 esac
 
 FULL_KAS="${KAS_FILE}"
