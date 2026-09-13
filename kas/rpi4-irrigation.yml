@@ -47,16 +47,13 @@ local_conf_header:
 
     # Headless controller — no display, no audio, no compositor. Also
     # drops network-facing services this appliance has no use for:
-    # rpcbind (nfs/3g), neard (nfc) and bluetooth.
+    # rpcbind (nfs), ofono (3g), neard (nfc) and bluetooth.
     DISTRO_FEATURES:remove = "x11 directfb vulkan wayland opengl nfs 3g nfc bluetooth"
     DISTRO_FEATURES:append = " pam"
 
     GPU_MEM = "16"
     ENABLE_UART = "1"
 
-    # Set here, not as a file shipped by irrigation-init: base-files already
-    # writes /etc/hostname from this variable, and a second package installing
-    # the same path is a packaging conflict, not an override.
     hostname:pn-base-files = "irrigation"
 
     # Accept restricted licenses required for RPi WiFi/BT firmware
