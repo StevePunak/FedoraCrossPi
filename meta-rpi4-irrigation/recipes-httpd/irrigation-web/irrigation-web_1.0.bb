@@ -14,8 +14,24 @@ do_install() {
         bbfatal "No index.html in ${IRRIGATION_WEB_DIST}. The directory exists but holds no bundle."
     fi
 
-    install -d ${D}/var/www/irrigation/html
-    cp -r ${IRRIGATION_WEB_DIST}/* ${D}/var/www/irrigation/html/
+    install -d ${D}${localstatedir}/www/irrigation/html
+    cp -r ${IRRIGATION_WEB_DIST}/* ${D}${localstatedir}/www/irrigation/html/
+    # cp -r carries the builder's umask; pseudo only fixes ownership, not mode.
+    chmod -R u=rwX,go=rX ${D}${localstatedir}/www/irrigation/html
 }
 
-FILES:${PN} = "/var/www/irrigation/"
+# IRRIGATION_WEB_DIST carries no SRC_URI entry, so removing this block
+# does not fail the build — it silently ships whatever bundle sstate
+# cached the first time, no matter what npm run build produces later.
+python() {
+    import os
+    dist = d.getVar("IRRIGATION_WEB_DIST")
+    checksums = []
+    if dist and os.path.isdir(dist):
+        for root, _dirs, files in os.walk(dist):
+            for name in files:
+                checksums.append("%s:True" % os.path.join(root, name))
+    d.appendVarFlag("do_install", "file-checksums", " " + " ".join(checksums))
+}
+
+FILES:${PN} = "${localstatedir}/www/irrigation/"
