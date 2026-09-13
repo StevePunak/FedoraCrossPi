@@ -8,6 +8,7 @@ RCONFLICTS:${PN} = "systemd-networkd-config systemd-networkd-gateway-config"
 SRC_URI = " \
     file://10-wired.network \
     file://20-wireless.network \
+    file://10-any.conf \
 "
 S = "${UNPACKDIR}"
 
@@ -22,12 +23,20 @@ do_install() {
 
     install -d ${D}${sysconfdir}
     ln -sf ../run/systemd/resolve/stub-resolv.conf ${D}${sysconfdir}/resolv.conf
+
+    # Belt and braces alongside 20-wireless.network's RequiredForOnline=no:
+    # whichever link comes up first releases network-online.target, so an
+    # ethernet-only boot doesn't wait out wlan0's dead 120s timeout either.
+    install -d ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d
+    install -m 0644 ${UNPACKDIR}/10-any.conf \
+        ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d/10-any.conf
 }
 
 FILES:${PN} = " \
     ${sysconfdir}/systemd/network/ \
     ${sysconfdir}/resolv.conf \
     ${libdir}/systemd/system-preset/90-networkd.preset \
+    ${systemd_system_unitdir}/systemd-networkd-wait-online.service.d/10-any.conf \
 "
 
 CONFFILES:${PN} = " \

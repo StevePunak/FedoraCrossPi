@@ -3,6 +3,9 @@ Type=ether
 
 [Network]
 DHCP=yes
+# Inert while "zeroconf" stays in DISTRO_FEATURES: that's what builds
+# systemd with its own mdns responder off, leaving avahi the only one
+# answering. Drop "zeroconf" and resolved starts answering on 5353 too.
 MulticastDNS=yes
 
 [DHCP]
