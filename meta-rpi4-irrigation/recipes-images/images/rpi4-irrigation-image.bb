@@ -33,7 +33,12 @@ IMAGE_INSTALL:append = " \
     i2c-tools \
 "
 
-IMAGE_FEATURES += "ssh-server-openssh package-management"
+# empty-root-password/allow-empty-password/allow-root-login give root an
+# empty password and let it in over SSH (this poky no longer has the old
+# debug-tweaks alias; these are the primitives it used to expand to).
+# Bring-up-only: it must come out before this image goes anywhere near a
+# customer's LAN, or anyone who can reach port 80 owns the box outright.
+IMAGE_FEATURES += "ssh-server-openssh package-management empty-root-password allow-empty-password allow-root-login"
 
 # Two sites both claiming default_server on :80 stops nginx from starting at all.
 remove_stock_nginx_site() {
