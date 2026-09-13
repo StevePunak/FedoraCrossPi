@@ -73,8 +73,8 @@ local_conf_header:
     # LOW-trigger board — from firmware through kernel boot. It covers only
     # up to the point irrigationd requests the lines for itself: once a
     # process releases a GPIO line the kernel reverts it to input and the
-    # pad's pull takes over, and six of the eight offsets (13, 16, 19, 20,
-    # 21, 26) are in BCM 9-27, which pull down — asserted on this board.
+    # pad's pull takes over, and six of the eight offsets (12, 13, 16, 19,
+    # 20, 21) are in BCM 9-27, which pull down — asserted on this board.
     # gpio=25=ip,pu pulls the stop button's input high; it reads a ground
     # switch and needs the opposite bias from the eight outputs.
     RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,12,13,16,19,20,21=op,dh\ngpio=25=ip,pu'
