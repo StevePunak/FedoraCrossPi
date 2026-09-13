@@ -2,12 +2,14 @@ DESCRIPTION = "systemd-networkd DHCP configuration for the irrigation controller
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
+RDEPENDS:${PN} = "systemd-networkd"
 RCONFLICTS:${PN} = "systemd-networkd-config systemd-networkd-gateway-config"
 
 SRC_URI = " \
     file://10-wired.network \
     file://20-wireless.network \
 "
+S = "${UNPACKDIR}"
 
 do_install() {
     install -d ${D}${sysconfdir}/systemd/network

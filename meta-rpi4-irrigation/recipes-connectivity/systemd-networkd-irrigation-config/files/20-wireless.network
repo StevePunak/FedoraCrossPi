@@ -9,3 +9,9 @@ MulticastDNS=yes
 UseDomains=yes
 # Higher than wired's RouteMetric: wireless loses the default route when both are up.
 RouteMetric=20
+
+[Link]
+# wpa_supplicant ships disabled with no SSID, so wlan0 never gains carrier;
+# without this, wait-online blocks network-online.target for its full 120s
+# timeout on every boot.
+RequiredForOnline=no
