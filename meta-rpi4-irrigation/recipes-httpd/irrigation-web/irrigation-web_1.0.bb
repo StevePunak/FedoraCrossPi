@@ -16,22 +16,14 @@ do_install() {
 
     install -d ${D}${localstatedir}/www/irrigation/html
     cp -r ${IRRIGATION_WEB_DIST}/* ${D}${localstatedir}/www/irrigation/html/
-    # cp -r carries the builder's umask; pseudo only fixes ownership, not mode.
+    # cp -r carries the builder's umask; pseudo only fixes ownership.
     chmod -R u=rwX,go=rX ${D}${localstatedir}/www/irrigation/html
 }
 
-# IRRIGATION_WEB_DIST carries no SRC_URI entry, so removing this block
-# does not fail the build — it silently ships whatever bundle sstate
-# cached the first time, no matter what npm run build produces later.
-python() {
-    import os
-    dist = d.getVar("IRRIGATION_WEB_DIST")
-    checksums = []
-    if dist and os.path.isdir(dist):
-        for root, _dirs, files in os.walk(dist):
-            for name in files:
-                checksums.append("%s:True" % os.path.join(root, name))
-    d.appendVarFlag("do_install", "file-checksums", " " + " ".join(checksums))
-}
+# The :True is what makes bitbake walk this as a directory at TASKHASH
+# time, every build, catching additions and deletions as well as content
+# changes. Drop it and this silently goes back to tracking nothing, since
+# IRRIGATION_WEB_DIST carries no SRC_URI entry of its own.
+do_install[file-checksums] += "${IRRIGATION_WEB_DIST}:True"
 
 FILES:${PN} = "${localstatedir}/www/irrigation/"
