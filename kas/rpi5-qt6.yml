@@ -70,3 +70,8 @@ local_conf_header:
     # Parallelism — 48 cores
     BB_NUMBER_THREADS = "48"
     PARALLEL_MAKE = "-j 48"
+
+    # meta-oe carries libgpiod 1.6.5 and 2.2.2 side by side and their APIs
+    # share no call signatures. Without this pin, version selection decides
+    # which headers land in the SDK sysroot.
+    PREFERRED_VERSION_libgpiod = "2.2.%"

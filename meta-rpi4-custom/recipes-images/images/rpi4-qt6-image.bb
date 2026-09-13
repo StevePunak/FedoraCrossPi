@@ -96,4 +96,4 @@ inherit populate_sdk_qt6
 
 # Additional dev libraries shipped in the SDK's target sysroot
 # so cross-compiled Qt apps can link against them from the Fedora host.
-TOOLCHAIN_TARGET_TASK:append = " libtorrent-rasterbar-dev"
+TOOLCHAIN_TARGET_TASK:append = " libtorrent-rasterbar-dev libgpiod-dev"
