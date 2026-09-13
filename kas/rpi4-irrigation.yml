@@ -45,12 +45,19 @@ local_conf_header:
     # Init system
     INIT_MANAGER = "systemd"
 
-    # Headless controller — no display, no audio, no compositor
-    DISTRO_FEATURES:remove = "x11 directfb vulkan wayland opengl"
+    # Headless controller — no display, no audio, no compositor. Also
+    # drops network-facing services this appliance has no use for:
+    # rpcbind (nfs/3g), neard (nfc) and bluetooth.
+    DISTRO_FEATURES:remove = "x11 directfb vulkan wayland opengl nfs 3g nfc bluetooth"
     DISTRO_FEATURES:append = " pam"
 
     GPU_MEM = "16"
     ENABLE_UART = "1"
+
+    # Set here, not as a file shipped by irrigation-init: base-files already
+    # writes /etc/hostname from this variable, and a second package installing
+    # the same path is a packaging conflict, not an override.
+    hostname:pn-base-files = "irrigation"
 
     # Accept restricted licenses required for RPi WiFi/BT firmware
     LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
@@ -66,9 +73,14 @@ local_conf_header:
     PREFERRED_VERSION_libgpiod = "2.2.2"
 
     # The gpio= line drives the relay inputs high — the inactive level for a
-    # LOW-trigger board — from the bootloader onward. Six of the eight zone
-    # lines come up asserted without it, because BCM 9-27 default to pull-down.
-    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,13,16,19,20,21,26=op,dh'
+    # LOW-trigger board — from firmware through kernel boot. It covers only
+    # up to the point irrigationd requests the lines for itself: once a
+    # process releases a GPIO line the kernel reverts it to input and the
+    # pad's pull takes over, and six of the eight offsets (13, 16, 19, 20,
+    # 21, 26) are in BCM 9-27, which pull down — asserted on this board.
+    # gpio=25=ip,pu pulls the stop button's input high; it reads a ground
+    # switch and needs the opposite bias from the eight outputs.
+    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,13,16,19,20,21,26=op,dh\ngpio=25=ip,pu'
 
     # busybox-syslog carries both syslog.service and busybox-klogd.service, and
     # journald already holds everything they would write. Left at its default
