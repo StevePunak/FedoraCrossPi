@@ -1,0 +1,15 @@
+[Unit]
+Description=Irrigation controller daemon
+Documentation=https://github.com/StevePunak/irrigation
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/irrigationd --config /etc/irrigationd.ini
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/var/lib/irrigationd
+
+[Install]
+WantedBy=multi-user.target
