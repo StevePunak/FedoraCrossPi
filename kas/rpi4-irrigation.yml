@@ -77,7 +77,7 @@ local_conf_header:
     # 21, 26) are in BCM 9-27, which pull down — asserted on this board.
     # gpio=25=ip,pu pulls the stop button's input high; it reads a ground
     # switch and needs the opposite bias from the eight outputs.
-    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,13,16,19,20,21,26=op,dh\ngpio=25=ip,pu'
+    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,12,13,16,19,20,21=op,dh\ngpio=25=ip,pu'
 
     # busybox-syslog carries both syslog.service and busybox-klogd.service, and
     # journald already holds everything they would write. Left at its default
