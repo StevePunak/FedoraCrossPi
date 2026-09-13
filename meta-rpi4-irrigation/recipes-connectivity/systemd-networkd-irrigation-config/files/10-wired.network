@@ -1,0 +1,11 @@
+[Match]
+Type=ether
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+[DHCP]
+UseDomains=yes
+# Lower than wireless's RouteMetric: wired wins the default route when both are up.
+RouteMetric=10

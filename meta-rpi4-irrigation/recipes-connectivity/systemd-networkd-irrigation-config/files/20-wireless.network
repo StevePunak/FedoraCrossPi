@@ -1,0 +1,11 @@
+[Match]
+Type=wlan
+
+[Network]
+DHCP=yes
+MulticastDNS=yes
+
+[DHCP]
+UseDomains=yes
+# Higher than wired's RouteMetric: wireless loses the default route when both are up.
+RouteMetric=20

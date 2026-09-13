@@ -22,6 +22,7 @@ IMAGE_INSTALL:append = " \
     avahi-daemon \
     avahi-libnss-mdns \
     wpa-supplicant \
+    systemd-networkd-irrigation-config \
     coreutils \
     util-linux \
     procps \
