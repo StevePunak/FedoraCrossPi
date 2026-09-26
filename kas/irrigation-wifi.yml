@@ -1,0 +1,16 @@
+# Overlay for kas/rpi4-irrigation.yml:
+#   kas build kas/rpi4-irrigation.yml:kas/irrigation-wifi.yml
+# meta-rpi4-private is gitignored and holds the site's Wi-Fi credentials.
+# Without it this overlay fails to parse; the base config builds without it.
+header:
+  version: 14
+
+repos:
+  meta-rpi4-private:
+    path: meta-rpi4-private
+    layers:
+      .:
+
+local_conf_header:
+  irrigation-wifi: |
+    IMAGE_INSTALL:append = " wifi-wlan0"
