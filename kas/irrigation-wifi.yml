@@ -14,3 +14,4 @@ repos:
 local_conf_header:
   irrigation-wifi: |
     IMAGE_INSTALL:append = " wifi-wlan0"
+    CYFMAC43455_SDIO_FIRMWARE = "standard"

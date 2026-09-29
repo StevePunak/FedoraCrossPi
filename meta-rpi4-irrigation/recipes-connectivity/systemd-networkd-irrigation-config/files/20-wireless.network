@@ -10,8 +10,6 @@ UseDomains=yes
 # Higher than wired's RouteMetric: wireless loses the default route when both are up.
 RouteMetric=20
 
-[Link]
-# wpa_supplicant ships disabled with no SSID, so wlan0 never gains carrier;
-# without this, wait-online blocks network-online.target for its full 120s
-# timeout on every boot.
-RequiredForOnline=no
+# No RequiredForOnline=no here: wait-online runs with --any (10-any.conf),
+# which ignores links not required for online, so a Wi-Fi-only boot would
+# sit out the full 120s timeout before network-online.target.
