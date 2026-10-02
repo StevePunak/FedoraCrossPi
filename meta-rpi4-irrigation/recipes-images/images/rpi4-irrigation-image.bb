@@ -8,6 +8,12 @@ IMAGE_INSTALL:append = " \
     irrigation-web \
     nginx \
     nginx-irrigation-config \
+    irrigation-data \
+    irrigation-ssl \
+    tailscale \
+    acme-sh \
+    iptables \
+    curl \
     libgpiod \
     libgpiod-tools \
     sqlite3 \
@@ -40,16 +46,17 @@ IMAGE_INSTALL:append = " \
 # customer's LAN, or anyone who can reach port 80 owns the box outright.
 IMAGE_FEATURES += "ssh-server-openssh package-management empty-root-password allow-empty-password allow-root-login"
 
-# Two sites both claiming default_server on :80 stops nginx from starting at all.
-remove_stock_nginx_site() {
+# Two sites both claiming default_server on :80 stops nginx from starting at
+# all. meta-rpi4-gateway's nginx bbappend deletes the stock site; building
+# without that layer brings it back.
+assert_no_stock_nginx_site() {
     stock_site="${IMAGE_ROOTFS}${sysconfdir}/nginx/sites-enabled/default_server"
-    if [ ! -e "$stock_site" ]; then
-        bbfatal "expected ${sysconfdir}/nginx/sites-enabled/default_server in the rootfs but it is already gone; meta-webserver's nginx.inc may no longer ship it there, so check before deleting this function"
+    if [ -e "$stock_site" ]; then
+        bbfatal "${sysconfdir}/nginx/sites-enabled/default_server is in the rootfs and collides with irrigation.conf's default_server; is meta-rpi4-gateway's nginx bbappend still in the build?"
     fi
-    rm -f "$stock_site"
 }
 
-ROOTFS_POSTPROCESS_COMMAND += "remove_stock_nginx_site"
+ROOTFS_POSTPROCESS_COMMAND += "assert_no_stock_nginx_site"
 
 # RPI_EXTRA_CONFIG is a plain assignment: a later kas fragment (a private
 # overlay, most likely) that also sets it for an unrelated reason silently

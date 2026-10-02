@@ -1,0 +1,15 @@
+[Unit]
+Description=Ensure nginx has a TLS certificate
+# Wants, not Requires: with /data missing the certificate lands on the rootfs
+# and nginx still starts. A hard dependency would take port 80 down with it.
+Wants=data.mount
+After=data.mount
+Before=nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/irrigation-ssl-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Persistent data partition
+Wants=irrigation-data-init.service
+After=irrigation-data-init.service
+
+[Mount]
+What=/dev/disk/by-label/irrigation-data
+Where=/data
+Type=ext4
+# nofail keeps a missing or broken /data out of local-fs.target. Without it a
+# failed mount drops the boot into emergency mode and irrigationd never starts.
+Options=defaults,noatime,nofail
+
+[Install]
+WantedBy=local-fs.target

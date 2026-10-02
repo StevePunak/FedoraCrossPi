@@ -35,6 +35,13 @@ repos:
     layers:
       .:
 
+  # Supplies tailscale, acme-sh, and the nginx bbappend (http2, stock site
+  # removed) that irrigation.conf depends on.
+  meta-rpi4-gateway:
+    path: meta-rpi4-gateway
+    layers:
+      .:
+
   meta-rpi4-irrigation:
     path: meta-rpi4-irrigation
     layers:
@@ -55,6 +62,7 @@ local_conf_header:
     ENABLE_UART = "1"
 
     hostname:pn-base-files = "irrigation"
+    DEFAULT_TIMEZONE = "America/Los_Angeles"
 
     # Accept restricted licenses required for RPi WiFi/BT firmware
     LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"

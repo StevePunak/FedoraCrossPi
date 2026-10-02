@@ -1,0 +1,13 @@
+[Unit]
+Description=Create the persistent /data partition
+DefaultDependencies=no
+After=systemd-remount-fs.service systemd-udevd.service
+Before=data.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/irrigation-data-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target

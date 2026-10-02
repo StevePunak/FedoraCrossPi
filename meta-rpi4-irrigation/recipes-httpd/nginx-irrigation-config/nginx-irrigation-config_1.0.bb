@@ -2,9 +2,13 @@ DESCRIPTION = "nginx site configuration for the irrigation controller"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-RDEPENDS:${PN} = "nginx"
+RDEPENDS:${PN} = "nginx irrigation-ssl"
 
-SRC_URI = "file://sites-available/irrigation.conf"
+SRC_URI = " \
+    file://sites-available/irrigation.conf \
+    file://irrigation-app.conf \
+"
+S = "${UNPACKDIR}"
 
 do_install() {
     install -d ${D}${sysconfdir}/nginx/sites-available
@@ -13,6 +17,8 @@ do_install() {
         ${D}${sysconfdir}/nginx/sites-available/irrigation.conf
     ln -s ../sites-available/irrigation.conf \
         ${D}${sysconfdir}/nginx/sites-enabled/irrigation.conf
+    install -m 0644 ${UNPACKDIR}/irrigation-app.conf \
+        ${D}${sysconfdir}/nginx/irrigation-app.conf
 
     install -d ${D}${libdir}/systemd/system-preset
     printf 'enable nginx.service\n' \
@@ -22,7 +28,8 @@ do_install() {
 FILES:${PN} = " \
     ${sysconfdir}/nginx/sites-available/ \
     ${sysconfdir}/nginx/sites-enabled/ \
+    ${sysconfdir}/nginx/irrigation-app.conf \
     ${libdir}/systemd/system-preset/91-nginx.preset \
 "
 
-CONFFILES:${PN} = "${sysconfdir}/nginx/sites-available/irrigation.conf"
+CONFFILES:${PN} = "${sysconfdir}/nginx/sites-available/irrigation.conf ${sysconfdir}/nginx/irrigation-app.conf"
