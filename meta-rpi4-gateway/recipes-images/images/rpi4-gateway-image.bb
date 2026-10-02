@@ -127,6 +127,15 @@ disable_root_ssh() {
         > ${IMAGE_ROOTFS}${sysconfdir}/ssh/sshd_config.d/10-harden.conf
 }
 
+# SSH: refuse connections from the tailnet. Tailscale's ts-input chain
+# accepts everything arriving on tailscale0, so without this sshd answers
+# every tailnet device.
+block_tailnet_ssh() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/sshd.socket.d
+    printf '[Socket]\nIPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48\n' \
+        > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/sshd.socket.d/no-tailnet.conf
+}
+
 # Install SSH public key into the gateway user's home
 install_gateway_ssh_key() {
     # `install -d` runs as root and leaves the directories root-owned —
@@ -142,4 +151,4 @@ install_gateway_ssh_key() {
     chown -R ${GATEWAY_UID}:${GATEWAY_GID} ${IMAGE_ROOTFS}/home/gateway
 }
 
-ROOTFS_POSTPROCESS_COMMAND += "install_sudoers; disable_root_ssh; install_gateway_ssh_key;"
+ROOTFS_POSTPROCESS_COMMAND += "install_sudoers; disable_root_ssh; block_tailnet_ssh; install_gateway_ssh_key;"
