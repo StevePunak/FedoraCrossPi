@@ -24,8 +24,8 @@ case "${TARGET}" in
     PRIVATE_KAS=""
     ;;
   irrigation)
-    KAS_FILE="${REPO_ROOT}/kas/rpi4-irrigation.yml"
-    PRIVATE_KAS="${REPO_ROOT}/../meta-rpi4-irrigation-private/kas/private.yml"
+    KAS_FILE="${REPO_ROOT}/kas/rpi4-irrigation.yml:${REPO_ROOT}/kas/irrigation-wifi.yml"
+    PRIVATE_KAS=""
     ;;
   *) echo "Usage: $0 [rpi4|rpi5|gateway|qemu-gateway|irrigation]" >&2; exit 1 ;;
 esac
@@ -47,7 +47,15 @@ fi
 
 if [ -n "${PRIVATE_KAS:-}" ] && [ -f "${PRIVATE_KAS}" ]; then
     cp "${PRIVATE_KAS}" "${LOCAL_KAS}"
-    exec kas build "${KAS_FILE}:${LOCAL_KAS}"
-else
-    exec kas build "${KAS_FILE}"
+    KAS_FILE="${KAS_FILE}:${LOCAL_KAS}"
 fi
+
+# The host's tar calls openat2, which pseudo cannot wrap, so packaging only
+# works inside this container. The tree must be mounted at its host path:
+# TMPDIR is recorded in build/tmp/saved_tmpdir, and a different mount point
+# (kas-container uses /work) breaks every later build.
+SRC_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+exec podman run --rm --userns=keep-id --pids-limit=-1 \
+    -v "${SRC_ROOT}:${SRC_ROOT}" -w "$(cd "${REPO_ROOT}" && pwd)" \
+    localhost/yocto-walnascar:ubuntu-22.04 \
+    bash -lc "kas build '${KAS_FILE}'"
