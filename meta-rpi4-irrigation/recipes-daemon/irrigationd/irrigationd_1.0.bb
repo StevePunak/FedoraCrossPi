@@ -9,7 +9,7 @@ DEPENDS = "qtbase qthttpserver libgpiod"
 # The container has no SSH client, so this and every URL in the
 # superproject's .gitmodules must stay https.
 SRC_URI = "gitsm://github.com/StevePunak/irrigation.git;protocol=https;branch=feature/superproject"
-SRCREV = "36df0fdd17d1b209adc93a3da8f981114b4b214f"
+SRCREV = "62f09e182774d4fccf922697df1a66a4dd6963d0"
 
 S = "${WORKDIR}/git"
 
