@@ -56,7 +56,16 @@ assert_no_stock_nginx_site() {
     fi
 }
 
-ROOTFS_POSTPROCESS_COMMAND += "assert_no_stock_nginx_site"
+# SSH: refuse connections from the tailnet. Tailscale's ts-input chain
+# accepts everything arriving on tailscale0, so without this sshd answers
+# every tailnet device.
+block_tailnet_ssh() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/sshd.socket.d
+    printf '[Socket]\nIPAddressDeny=100.64.0.0/10 fd7a:115c:a1e0::/48\n' \
+        > ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/sshd.socket.d/no-tailnet.conf
+}
+
+ROOTFS_POSTPROCESS_COMMAND += "assert_no_stock_nginx_site; block_tailnet_ssh;"
 
 # RPI_EXTRA_CONFIG is a plain assignment: a later kas fragment (a private
 # overlay, most likely) that also sets it for an unrelated reason silently
