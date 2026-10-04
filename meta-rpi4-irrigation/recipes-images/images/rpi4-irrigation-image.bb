@@ -67,11 +67,14 @@ ROOTFS_POSTPROCESS_COMMAND += "assert_no_stock_nginx_site"
 do_image_complete[depends] += "rpi-config:do_deploy"
 assert_gpio_safety_line() {
     generated="${DEPLOY_DIR_IMAGE}/bootfiles/config.txt"
-    if ! grep -q 'gpio=5,6,12,13,16,19,20,21=op,dh' "$generated"; then
-        bbfatal "gpio=5,6,12,13,16,19,20,21=op,dh missing from $generated — RPI_EXTRA_CONFIG did not reach the boot partition, and the relay lines come up unheld"
+    if ! grep -qF 'gpio=5,6,12,13,16,19,20,21=op,dh,pu' "$generated"; then
+        bbfatal "gpio=5,6,12,13,16,19,20,21=op,dh,pu missing from $generated — RPI_EXTRA_CONFIG did not reach the boot partition, and the relay lines come up unheld"
     fi
-    if ! grep -q 'gpio=25=ip,pu' "$generated"; then
+    if ! grep -qF 'gpio=25=ip,pu' "$generated"; then
         bbfatal "gpio=25=ip,pu missing from $generated — the stop button input has no pull-up and reads a floating line"
+    fi
+    if ! grep -qF 'gpio=24=ip,pu' "$generated"; then
+        bbfatal "gpio=24=ip,pu missing from $generated — the RUN button input has no pull-up until irrigationd requests the line"
     fi
 }
 

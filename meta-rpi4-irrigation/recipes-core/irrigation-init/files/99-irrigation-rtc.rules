@@ -1,0 +1,3 @@
+# irrigationd.service orders itself after dev-rtc0.device, which systemd
+# tracks only for a device udev tags "systemd".
+SUBSYSTEM=="rtc", KERNEL=="rtc0", TAG+="systemd"

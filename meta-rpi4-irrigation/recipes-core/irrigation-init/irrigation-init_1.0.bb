@@ -5,6 +5,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 SRC_URI = " \
     file://irrigationd.service \
     file://irrigationd.ini \
+    file://99-irrigation-rtc.rules \
+    file://dev-rtc0-timeout.conf \
 "
 S = "${UNPACKDIR}"
 
@@ -14,6 +16,14 @@ do_install() {
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${UNPACKDIR}/irrigationd.service ${D}${systemd_system_unitdir}/irrigationd.service
+
+    install -d ${D}${systemd_system_unitdir}/dev-rtc0.device.d
+    install -m 0644 ${UNPACKDIR}/dev-rtc0-timeout.conf \
+        ${D}${systemd_system_unitdir}/dev-rtc0.device.d/10-irrigation-timeout.conf
+
+    install -d ${D}${nonarch_base_libdir}/udev/rules.d
+    install -m 0644 ${UNPACKDIR}/99-irrigation-rtc.rules \
+        ${D}${nonarch_base_libdir}/udev/rules.d/99-irrigation-rtc.rules
 
     # var-volatile-lib.service only skips /var/lib because
     # ConditionPathIsReadWrite=!/var/lib is false on a writable rootfs. A
@@ -29,6 +39,8 @@ do_install() {
 FILES:${PN} = " \
     ${sysconfdir}/irrigationd.ini \
     ${systemd_system_unitdir}/irrigationd.service \
+    ${systemd_system_unitdir}/dev-rtc0.device.d/10-irrigation-timeout.conf \
+    ${nonarch_base_libdir}/udev/rules.d/99-irrigation-rtc.rules \
     ${localstatedir}/lib/irrigationd \
     ${libdir}/systemd/system-preset/90-irrigationd.preset \
 "

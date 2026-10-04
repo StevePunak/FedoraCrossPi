@@ -77,15 +77,14 @@ local_conf_header:
     # share no call signatures.
     PREFERRED_VERSION_libgpiod = "2.2.2"
 
-    # The gpio= line drives the relay inputs high — the inactive level for a
-    # LOW-trigger board — from firmware through kernel boot. It covers only
-    # up to the point irrigationd requests the lines for itself: once a
-    # process releases a GPIO line the kernel reverts it to input and the
-    # pad's pull takes over, and six of the eight offsets (12, 13, 16, 19,
-    # 20, 21) are in BCM 9-27, which pull down — asserted on this board.
-    # gpio=25=ip,pu pulls the stop button's input high; it reads a ground
-    # switch and needs the opposite bias from the eight outputs.
-    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,12,13,16,19,20,21=op,dh\ngpio=25=ip,pu'
+    # The zone gpio= line drives the relay inputs high, the inactive level
+    # for a LOW-trigger board, from firmware through kernel boot. Its pu
+    # keeps each pad pulled high once irrigationd releases the line; without
+    # it six of the eight offsets (12, 13, 16, 19, 20, 21, all in BCM 9-27)
+    # fall back to a pull-down, which asserts a relay. gpio=25=ip,pu and
+    # gpio=24=ip,pu pull the STOP and RUN inputs high; each reads a switch
+    # to ground.
+    RPI_EXTRA_CONFIG = 'dtparam=i2c_arm=on\ndtoverlay=i2c-rtc,ds3231\ngpio=5,6,12,13,16,19,20,21=op,dh,pu\ngpio=25=ip,pu\ngpio=24=ip,pu'
 
     # busybox-syslog carries both syslog.service and busybox-klogd.service, and
     # journald already holds everything they would write. Left at its default
