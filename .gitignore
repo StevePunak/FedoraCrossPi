@@ -26,6 +26,7 @@ __pycache__/
 
 # Private layers
 meta-rpi4-private/
+meta-rpi4-irrigation-private/
 meta-rpi4-gateway-private/
 
 # Operator SSH keys baked into the gateway image (see *.example)
